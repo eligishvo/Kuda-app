@@ -108,7 +108,13 @@ async function cached(env: Env, deps: Deps, key: string, ttl: number, load: () =
   return reply({ ok: true, data, cached: false, usage: await readUsage(env, deps.now()) });
 }
 
-export async function handle(request: Request, env: Env, deps: Deps = { fetch, now: () => new Date() }): Promise<Response> {
+/**
+ * The real internet and clock. fetch is wrapped in a small function on purpose: Cloudflare refuses to run
+ * its fetch when it is called as a property of another object ("Illegal invocation").
+ */
+export const REAL: Deps = { fetch: (input, init) => fetch(input, init), now: () => new Date() };
+
+export async function handle(request: Request, env: Env, deps: Deps = REAL): Promise<Response> {
   const url = new URL(request.url);
   const q = url.searchParams;
   if (request.method === 'OPTIONS') return new Response(null, { headers: CORS });
@@ -181,6 +187,9 @@ export async function handle(request: Request, env: Env, deps: Deps = { fetch, n
   } catch (e) {
     const usage = await readUsage(env, deps.now()).catch(() => undefined);
     if (e instanceof Problem) return reply({ ok: false, error: e.message, usage }, e.status);
-    return reply({ ok: false, error: 'The Worker hit an unexpected error.', usage }, 500);
+    // Say what went wrong (never includes the keys: they only appear in outgoing addresses, not in errors we build)
+    const detail = e instanceof Error ? e.message.slice(0, 200) : 'unknown';
+    console.log('Unexpected error', detail);
+    return reply({ ok: false, error: `The Worker hit an unexpected error: ${detail}`, usage }, 500);
   }
 }

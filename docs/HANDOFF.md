@@ -115,6 +115,10 @@ None recorded yet (nothing has run on a phone).
 
 ## Changelog
 
+- **2026-11-12** — Owner ran the app in Expo Go: globe, selection, themes, settings and the debug screen's Usage
+  all worked. Calls that reach SerpApi / Travelpayouts failed with "unexpected error": the Worker called
+  Cloudflare's `fetch` as a property of an object, which Cloudflare refuses. Fixed (`REAL` in `handler.ts`), and
+  unexpected errors now say what they were. Also fixed `npm install` on a fresh clone (react-dom pinned).
 - **2026-11-12** — First "Deploy worker" run failed: the deploy step installed wrangler into the app's packages
   and hit a peer-dependency conflict. Fixed by giving `worker/` its own `package.json` with wrangler.
 - **2026-11-12** — Phase 2 written in the same cloud session: shared types and normalizers, the Worker, the API
