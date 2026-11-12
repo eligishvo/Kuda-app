@@ -204,6 +204,9 @@ None recorded yet (nothing has run on a phone).
 
 ## Changelog
 
+- **2026-11-12** — First GitHub run: Expo project linked, Android preview build started, Worker redeployed; the
+  update step failed because it bundled every platform and the app has no web packages. Publishing is now
+  Android only (`eas update --platform android`).
 - **2026-11-12** — Owner's requests: Adults also in Settings; fly back from a different airport (Worker `back`
   parameter with multi-city search, chooser on the destination screen, `returnFrom` in the saved trip). 110 tests.
   Owner said to publish: this commit runs the checks, publishes the first Expo update and starts the first

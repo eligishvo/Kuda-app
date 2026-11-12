@@ -91,4 +91,5 @@ jobs:
       - name: Publish update
         env:
           MESSAGE: ${{ github.event.head_commit.message || 'Manual update' }}
-        run: eas update --branch preview --message "$(echo "$MESSAGE" | head -n 1)" --non-interactive
+        # Android only: the app has no web version, and bundling "all" platforms would look for web packages
+        run: eas update --branch preview --platform android --message "$(echo "$MESSAGE" | head -n 1)" --non-interactive
