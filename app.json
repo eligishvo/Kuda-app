@@ -35,7 +35,18 @@
       },
       "kuda": {
         "workerUrl": "https://kuda-worker.eligishvo.workers.dev"
+      },
+      "router": {
+        "asyncRoutes": {
+          "web": true
+        }
+      },
+      "eas": {
+        "projectId": "8b5bc7bb-88c7-4feb-b160-3d8c4fa15929"
       }
+    },
+    "updates": {
+      "url": "https://u.expo.dev/8b5bc7bb-88c7-4feb-b160-3d8c4fa15929"
     }
   }
 }
