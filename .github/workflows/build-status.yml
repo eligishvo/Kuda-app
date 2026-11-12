@@ -15,27 +15,6 @@ jobs:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
       - name: Latest builds
-        run: eas build:list --limit 3 --platform android --non-interactive --json > builds.json && node -e "
-          const b=require('./builds.json');
-          for (const x of b) console.log(x.id, x.status, x.createdAt, x.error ? JSON.stringify(x.error) : '', x.artifacts?.buildUrl ?? '');
-          "
-      - name: Why the newest build failed
         run: |
-          node -e "
-          const b=require('./builds.json')[0];
-          if (!b || b.status !== 'ERRORED') { console.log('Newest build did not fail:', b && b.status); process.exit(0); }
-          require('fs').writeFileSync('logs.txt', (b.logFiles ?? []).join('\n'));
-          "
-          [ -f logs.txt ] || exit 0
-          n=0
-          while read -r url; do
-            n=$((n+1))
-            curl -sSL "$url" -o "log$n.txt" || true
-          done < logs.txt
-          # EAS logs are one JSON object per line with the text in "msg"
-          cat log*.txt | node -e "
-          const lines=require('fs').readFileSync(0,'utf8').split('\n').map(l=>{try{return JSON.parse(l).msg}catch{return l}}).filter(Boolean);
-          const hit=lines.findIndex(l=>/FAILURE: Build failed|What went wrong|error:|Execution failed/i.test(l));
-          const from=Math.max(0,(hit<0?lines.length:hit)-40);
-          console.log(lines.slice(from, from+140).join('\n'));
-          "
+          eas build:list --limit 3 --platform android --non-interactive --json > builds.json
+          node scripts/build-status.js
