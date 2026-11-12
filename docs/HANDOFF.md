@@ -115,6 +115,8 @@ None recorded yet (nothing has run on a phone).
 
 ## Changelog
 
+- **2026-11-12** — First "Deploy worker" run failed: the deploy step installed wrangler into the app's packages
+  and hit a peer-dependency conflict. Fixed by giving `worker/` its own `package.json` with wrangler.
 - **2026-11-12** — Phase 2 written in the same cloud session: shared types and normalizers, the Worker, the API
   client and debug screen, fixtures and tests (68 passing), deploy workflow and instructions. Checks: typecheck,
   tests, Android bundle, wrangler dry-run build. Not deployed, not called with real keys.
