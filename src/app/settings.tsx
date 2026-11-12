@@ -72,7 +72,7 @@ export default function Settings() {
         {Updates.updateId ? ` · update ${Updates.updateId.slice(0, 8)}` : ''}
       </Text>
       <Text style={[styles.body, { color: t.muted }]}>
-        Borders: Natural Earth. Airports: OurAirports. Both are public domain.
+        Borders: Natural Earth. Airports: OurAirports (both public domain). City names: OpenFlights (Open Database License).
       </Text>
     </ScrollView>
   );

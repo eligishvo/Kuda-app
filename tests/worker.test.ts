@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { Env, handle, Store } from '../worker/src/handler';
 import explore from './fixtures/explore.json';
 import flights from './fixtures/flights.json';
+import onewaysBack from './fixtures/oneways-back.json';
+import onewaysOut from './fixtures/oneways-out.json';
 import travelpayouts from './fixtures/travelpayouts.json';
 
 /** A fake KV store that also remembers how long each key was meant to live. */
@@ -25,7 +27,8 @@ function fakeFetch(overrides: Record<string, unknown> = {}) {
     const url = new URL(input);
     calls.push(url);
     let body: unknown;
-    if (url.hostname === 'api.travelpayouts.com') body = overrides.travelpayouts ?? travelpayouts;
+    if (url.hostname === 'api.travelpayouts.com' && url.searchParams.get('one_way') === 'true') body = url.searchParams.get('origin') ? onewaysOut : onewaysBack;
+    else if (url.hostname === 'api.travelpayouts.com') body = overrides.travelpayouts ?? travelpayouts;
     else if (url.searchParams.get('engine') === 'google_travel_explore') body = overrides.explore ?? explore;
     else body = overrides.flights ?? flights;
     return { ok: true, status: 200, json: async () => body };
@@ -119,9 +122,24 @@ describe('Worker: endpoints', () => {
     const { call, net } = setup();
     const r = await call('/estimates?origin=TLV&from=2026-12&to=2026-12');
     expect(r.body).toMatchObject({ ok: true, usage: { used: 0 } });
-    expect(r.body.data.map((d: any) => d.airport)).toEqual(['LCA', 'BUD', 'LIS']);
+    expect([...new Set(r.body.data.map((d: any) => d.airport))]).toEqual(['LCA', 'BUD', 'LIS']);
     expect(net.calls[0].hostname).toBe('api.travelpayouts.com');
     expect(Object.fromEntries(net.calls[0].searchParams)).toMatchObject({ origin: 'TLV', departure_at: '2026-12', return_at: '2026-12', one_way: 'false', token: 'tp-token' });
+  });
+
+  it('/oneways asks Travelpayouts for one-way fares out of, or back to, the airport (free)', async () => {
+    const { call, net } = setup();
+    const out = await call('/oneways?origin=TLV&month=2026-12&dir=out');
+    expect(out.body).toMatchObject({ ok: true, usage: { used: 0 } });
+    expect(out.body.data[0]).toMatchObject({ airport: 'ATH', price: 55, date: '2026-12-07' });
+    expect(Object.fromEntries(net.calls[0].searchParams)).toMatchObject({ origin: 'TLV', departure_at: '2026-12', one_way: 'true' });
+    expect(net.calls[0].searchParams.get('destination')).toBeNull();
+    const back = await call('/oneways?origin=TLV&month=2026-12&dir=back');
+    expect(back.body.data[0]).toMatchObject({ airport: 'SKG', price: 33 });
+    expect(net.calls[1].searchParams.get('destination')).toBe('TLV');
+    expect(net.calls[1].searchParams.get('origin')).toBeNull();
+    expect((await call('/oneways?origin=TLV&month=2026-12&dir=sideways')).status).toBe(400);
+    expect((await call('/oneways?origin=TLV&month=12&dir=out')).status).toBe(400);
   });
 
   it('/flights lists outbound options with their departure tokens (kept one hour)', async () => {

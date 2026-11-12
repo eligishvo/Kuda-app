@@ -5,10 +5,12 @@ import { BlurMask, Canvas, Circle, DashPathEffect, Fill, Path, RadialGradient, S
 import { useCallback, useEffect, useState } from 'react';
 import { LayoutChangeEvent, StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import { cancelAnimation, runOnJS, useDerivedValue, useSharedValue, withDecay } from 'react-native-reanimated';
+import { cancelAnimation, runOnJS, useAnimatedReaction, useDerivedValue, useSharedValue, withDecay } from 'react-native-reanimated';
 import { Theme } from '../theme/themes';
+import { CityLabels } from './CityLabels';
 import { drawAirports, drawCountries, drawGraticule } from './draw';
 import { Hit, hitPin, hitTest } from './hitTest';
+import { MapLabel, pickLabels } from './labels';
 import { Pin, PIN_H, PIN_LIFT, PIN_W, pinShows } from './pins';
 import { PricePins } from './PricePins';
 import { MapView } from './useMapView';
@@ -33,11 +35,15 @@ type Props = {
   airportFlags: number[];
   /** The departure airports as lon, lat, lon, lat… Each gets a ring. */
   departures: number[];
+  /** Airports whose city name always shows when they are on screen (selected, departure, priced). */
+  named: Set<string>;
+  /** How much of the screen the top bar and the bottom panel cover: names aren't placed there. */
+  covered: { top: number; bottom: number };
   /** Called with what was tapped (null for sea or space) and whether the map was flat at the time. */
   onHit: (hit: Hit, flat: boolean) => void;
 };
 
-export function GlobeMap({ theme, view, pins, flagsLow, flagsHigh, airportFlags, departures, onHit }: Props) {
+export function GlobeMap({ theme, view, pins, flagsLow, flagsHigh, airportFlags, departures, named, covered, onHit }: Props) {
   const [size, setSize] = useState({ w: 0, h: 0 });
   const w = size.w;
   const h = size.h;
@@ -112,6 +118,30 @@ export function GlobeMap({ theme, view, pins, flagsLow, flagsHigh, airportFlags,
   // The globe is lit from the top left
   const lightAt = useDerivedValue(() => Skia.Point(w / 2 - frame.value.R * 0.35, h / 2 - frame.value.R * 0.35));
   const lightReach = useDerivedValue(() => frame.value.R * 1.5);
+
+  // City names: chosen again whenever the map has moved about 50 pixels or zoomed a step
+  const [labels, setLabels] = useState<MapLabel[]>([]);
+  const refreshLabels = useCallback(
+    (lon0: number, lat0: number, z: number) => {
+      if (w === 0 || h === 0) return;
+      setLabels(pickLabels(makeView(lon0, lat0, z, w, h), w, h, AIRPORTS, named, covered));
+    },
+    [w, h, named, covered],
+  );
+  useAnimatedReaction(
+    () => {
+      const step = 50 / (Math.max(1, Math.min(w, h)) * BASE_RADIUS * zoom.value) / DEG;
+      return `${Math.round(lon.value / step)}:${Math.round(lat.value / step)}:${Math.round(Math.log(zoom.value) * 8)}`;
+    },
+    (key, previous) => {
+      if (key !== previous) runOnJS(refreshLabels)(lon.value, lat.value, zoom.value);
+    },
+    [w, h, refreshLabels],
+  );
+  // Also when the selection or the panels change while the map stands still
+  useEffect(() => {
+    refreshLabels(lon.value, lat.value, zoom.value);
+  }, [refreshLabels, lon, lat, zoom]);
 
   // Gestures. Pinch remembers the place under the fingers and keeps it there while zooming.
   const startZoom = useSharedValue(1);
@@ -224,6 +254,7 @@ export function GlobeMap({ theme, view, pins, flagsLow, flagsHigh, airportFlags,
             <Path path={depRings} style="stroke" strokeWidth={1.5} color={theme.departureRing} />
           </Canvas>
         )}
+        {w > 0 && h > 0 && labels.length > 0 && <CityLabels theme={theme} labels={labels} view={view} width={w} height={h} />}
         {w > 0 && h > 0 && pins.length > 0 && <PricePins theme={theme} pins={pins} view={view} width={w} height={h} />}
       </View>
     </GestureDetector>

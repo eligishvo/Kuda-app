@@ -28,6 +28,26 @@ export type PriceEstimate = {
   stops: number | null;
   /** Airline name or code, when known. */
   airline?: string;
+  /** Take-off times of the flight out and the flight back ("05:15"), when the source gives them. */
+  outTime?: string;
+  retTime?: string;
+};
+
+/**
+ * A one-way fare between the departure airport and another airport on one date. Two of these (one out, one
+ * back from a different airport) make an estimate for a trip that returns from another airport.
+ */
+export type OneWay = {
+  /** The airport at the other end (where you land going out, or where you leave from coming back). */
+  airport: string;
+  date: DateText;
+  /** Take-off time, e.g. "05:15", when known. */
+  time?: string;
+  /** US dollars per person. Nonstop fares already include the +10% adjustment. */
+  price: number;
+  stops: number | null;
+  airline?: string;
+  confidence: 'estimate' | 'rough';
 };
 
 /** A place you can fly to, with the best price found for it. */

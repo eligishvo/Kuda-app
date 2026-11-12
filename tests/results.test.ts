@@ -3,11 +3,13 @@ import { hitPin } from '../src/map/hitTest';
 import { airportByCode, airportLabel } from '../src/map/mapData';
 import { labelLimit, Pin, PIN_H, PIN_LIFT, PIN_W, pinShows } from '../src/map/pins';
 import { makeView, project } from '../src/map/projection';
-import { buildResults, planCalls, priceText, stopsText } from '../src/results/results';
+import { buildMixed, buildOptions, buildResults, defaultFilters, filterOptions, planCalls, priceText, stopsText, totalCost } from '../src/results/results';
 import { defaultSearch, Search } from '../src/search/search';
-import { normalizeExplore, normalizeTravelpayouts } from '../shared/normalize';
+import { normalizeExplore, normalizeOneWays, normalizeTravelpayouts } from '../shared/normalize';
 import { Destination } from '../shared/types';
 import exploreRaw from './fixtures/explore.json';
+import onewaysBackRaw from './fixtures/oneways-back.json';
+import onewaysOutRaw from './fixtures/oneways-out.json';
 import travelpayoutsRaw from './fixtures/travelpayouts.json';
 
 // 5–9 nights between 5 and 20 December, up to $400
@@ -18,13 +20,18 @@ const build = (s: Search, selected: string[], ex = explore, es = estimates) => b
 
 describe('planning the calls', () => {
   it('asks Google once per month you could leave in, with the matching trip length', () => {
-    expect(planCalls(search)).toEqual({ explore: [{ month: 12, duration: 2 }], estimates: [{ from: '2026-12', to: '2026-12' }] });
+    expect(planCalls({ ...search, mixAirports: false })).toEqual({ explore: [{ month: 12, duration: 2 }], estimates: [{ from: '2026-12', to: '2026-12' }], oneWays: [] });
+    // With "return from another airport" on, the free one-way fares are asked for too
+    expect(planCalls(search).oneWays).toEqual([{ month: '2026-12', dir: 'out' }, { month: '2026-12', dir: 'back' }]);
   });
 
   it('covers a window that runs into the next month', () => {
     const p = planCalls({ ...search, earliestOut: '2026-12-20', latestRet: '2027-01-25' });
     expect(p.explore).toEqual([{ month: 12, duration: 2 }, { month: 1, duration: 2 }]);
     expect(p.estimates).toEqual([{ from: '2026-12', to: '2026-12' }, { from: '2026-12', to: '2027-01' }, { from: '2027-01', to: '2027-01' }]);
+    expect(p.oneWays).toEqual([
+      { month: '2026-12', dir: 'out' }, { month: '2027-01', dir: 'out' }, { month: '2026-12', dir: 'back' }, { month: '2027-01', dir: 'back' },
+    ]);
   });
 
   it('leaving in December and returning in early January needs the cross-month estimate too', () => {
@@ -97,6 +104,97 @@ describe('building results', () => {
     expect([priceText(fco), priceText(bud), priceText(lis), priceText(lgw)]).toEqual(['$97', 'from ~$110', 'rough ~$310', 'No estimate']);
     expect([priceText(fco, true), priceText(bud, true), priceText(lis, true), priceText(lgw, true)]).toEqual(['$97', '~$110', '~$310?', '?']);
     expect([stopsText(0), stopsText(1), stopsText(2), stopsText(null)]).toEqual(['nonstop', '1 stop', '2 stops', '']);
+  });
+});
+
+describe('the results list', () => {
+  const options = buildOptions(search, [], explore, estimates, airportByCode);
+  const key = (o: { airport: string; estimate: { price: number } }) => `${o.airport} ${o.estimate.price}`;
+
+  it('lists every priced option that fits the dates, with the airport’s city and name', () => {
+    expect(options.map(key).sort()).toEqual(['ATH 142', 'BUD 110', 'BUD 90', 'FCO 97', 'LIS 310']);
+    expect(options.find((o) => o.airport === 'BUD' && o.estimate.price === 110)).toMatchObject({
+      city: 'Budapest', kind: 'estimate', estimate: { outDate: '2026-12-08', retDate: '2026-12-14', nights: 6, outTime: '05:15', retTime: '21:30' },
+    });
+  });
+
+  it('keeps only the selected airports when some are selected', () => {
+    expect(buildOptions(search, ['ATH', 'SOF'], explore, estimates, airportByCode).map(key)).toEqual(['ATH 142']);
+  });
+
+  it('starts from the search’s budget, trip length and options, cheapest first', () => {
+    const f = defaultFilters(search);
+    expect(f).toEqual({ maxPrice: 400, minDays: 5, maxDays: 9, nonstopOnly: false, liveOnly: false, mixed: true, sort: 'price' });
+    expect(filterOptions(options, f).map(key)).toEqual(['BUD 90', 'FCO 97', 'BUD 110', 'ATH 142', 'LIS 310']);
+  });
+
+  it('filters by price, length, stops and source', () => {
+    const f = defaultFilters(search);
+    expect(filterOptions(options, { ...f, maxPrice: 120 }).map(key)).toEqual(['BUD 90', 'FCO 97', 'BUD 110']);
+    expect(filterOptions(options, { ...f, minDays: 7, maxDays: 7 }).map(key)).toEqual(['ATH 142']);
+    expect(filterOptions(options, { ...f, nonstopOnly: true }).map(key)).toEqual(['BUD 110', 'ATH 142']);
+    expect(filterOptions(options, { ...f, liveOnly: true }).map(key)).toEqual(['FCO 97', 'ATH 142']);
+  });
+
+  it('sorts by departure date or by length', () => {
+    const f = defaultFilters(search);
+    expect(filterOptions(options, { ...f, sort: 'date' }).map((o) => o.estimate.outDate)).toEqual(['2026-12-07', '2026-12-08', '2026-12-09', '2026-12-10', '2026-12-11']);
+    expect(filterOptions(options, { ...f, sort: 'length' }).map((o) => o.estimate.nights)).toEqual([6, 6, 6, 7, 9]);
+  });
+
+  it('multiplies the per-person price by the number of adults', () => {
+    expect(totalCost(options.find((o) => o.airport === 'ATH')!, 3)).toBe(426);
+  });
+});
+
+describe('flying home from a different airport', () => {
+  const outs = [normalizeOneWays(onewaysOutRaw, 'out')];
+  const backs = [normalizeOneWays(onewaysBackRaw, 'back')];
+  const line = (o: { airport: string; back?: { airport: string }; estimate: { price: number; outDate: string; retDate: string } }) =>
+    `${o.airport}>${o.back?.airport} ${o.estimate.price} ${o.estimate.outDate.slice(8)}-${o.estimate.retDate.slice(8)}`;
+
+  it('reads one-way fares in both directions, hiding Russian routes', () => {
+    expect(outs[0].map((o) => `${o.airport} ${o.price} ${o.confidence}`)).toEqual(['ATH 55 estimate', 'ATH 66 estimate', 'SKG 70 rough', 'FCO 88 estimate']);
+    expect(outs[0][0]).toMatchObject({ date: '2026-12-07', time: '06:30', stops: 0, airline: 'A3' });
+    expect(backs[0].map((o) => `${o.airport} ${o.price}`)).toEqual(['SKG 33', 'SKG 44', 'ATH 61', 'NAP 72']);
+  });
+
+  it('pairs an outbound fare to one selected airport with a return fare from another', () => {
+    const mixed = buildMixed(search, ['ATH', 'SKG', 'FCO', 'NAP'], outs, backs, airportByCode);
+    // Into Athens on the 7th (55) or 9th (66), home from Thessaloniki on the 14th (44): 7 and 5 days
+    expect(mixed.map(line)).toContain('ATH>SKG 99 07-14');
+    expect(mixed.map(line)).toContain('ATH>SKG 110 09-14');
+    expect(mixed.map(line)).toContain('FCO>NAP 160 10-16');
+    // Never the same airport both ways, never dates outside the window (the cheap return on the 30th)
+    expect(mixed.every((o) => o.back && o.back.airport !== o.airport)).toBe(true);
+    expect(mixed.every((o) => o.estimate.retDate <= '2026-12-20')).toBe(true);
+    // Cheapest first
+    expect(mixed.map((o) => o.estimate.price)).toEqual([...mixed.map((o) => o.estimate.price)].sort((a, b) => a - b));
+  });
+
+  it('describes the combined trip: both times, the worse number of stops, how far to trust it', () => {
+    const o = buildMixed(search, ['ATH', 'SKG'], outs, backs, airportByCode).find((x) => line(x) === 'ATH>SKG 99 07-14')!;
+    expect(o).toMatchObject({
+      city: 'Athens', kind: 'estimate', back: { airport: 'SKG', city: 'Thessaloniki' },
+      estimate: { nights: 7, stops: 0, outTime: '06:30', retTime: '18:00', confidence: 'estimate' },
+    });
+    // Out to Thessaloniki is a connecting fare, so that combination is only rough
+    const rough = buildMixed(search, ['ATH', 'SKG'], outs, backs, airportByCode).find((x) => x.airport === 'SKG')!;
+    expect(rough).toMatchObject({ kind: 'rough', back: { airport: 'ATH' }, estimate: { stops: 1 } });
+  });
+
+  it('with nothing selected, only pairs airports that are near each other', () => {
+    const mixed = buildMixed(search, [], outs, backs, airportByCode);
+    expect(mixed.map(line)).toContain('ATH>SKG 99 07-14'); // about 300 km apart
+    expect(mixed.map(line)).toContain('FCO>NAP 160 10-16'); // about 200 km apart
+    expect(mixed.some((o) => o.airport === 'ATH' && o.back?.airport === 'NAP')).toBe(false); // about 900 km
+  });
+
+  it('can be switched off in the list', () => {
+    const all = [...buildOptions(search, [], explore, estimates, airportByCode), ...buildMixed(search, [], outs, backs, airportByCode)];
+    const f = defaultFilters(search);
+    expect(filterOptions(all, f).some((o) => o.back)).toBe(true);
+    expect(filterOptions(all, { ...f, mixed: false }).some((o) => o.back)).toBe(false);
   });
 });
 

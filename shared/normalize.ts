@@ -1,7 +1,7 @@
 // Turns the raw answers of SerpApi and Travelpayouts into the app's own types (shared/types.ts).
 // Pure functions with no network calls, so they're tested against small saved answers in tests/fixtures.
 import { isDate, nightsBetween } from './dates';
-import { Destination, Itinerary, Layover, Leg } from './types';
+import { Destination, Itinerary, Layover, Leg, OneWay } from './types';
 
 const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
 const text = (v: unknown): string => (typeof v === 'string' ? v : '');
@@ -56,14 +56,20 @@ export const HIDDEN_AIRPORTS = new Set([
 /** Airlines whose routes Google doesn't sell (A4 = Azimuth). */
 export const HIDDEN_AIRLINES = new Set(['A4']);
 
+/** How many date options are kept per airport from one Travelpayouts answer. */
+export const OPTIONS_PER_AIRPORT = 8;
+
+const clockOf = (stamp: string) => (/T\d{2}:\d{2}/.test(stamp) ? stamp.slice(11, 16) : undefined);
+
 /**
- * Travelpayouts (Aviasales) prices_for_dates → destinations: the cheapest fare per destination airport.
- * Nonstop fares become "estimate" (+10%), connecting ones "rough".
+ * Travelpayouts (Aviasales) prices_for_dates → destinations. Each airport keeps up to eight options on
+ * different dates (nonstop before connecting, then the cheapest), so the results list can offer a choice of
+ * dates. Nonstop fares become "estimate" (+10%), connecting ones "rough".
  */
 export function normalizeTravelpayouts(raw: unknown): Destination[] {
   const list = (raw as Raw)?.data;
   if (!Array.isArray(list)) return [];
-  const best = new Map<string, Destination>();
+  const byAirport = new Map<string, Map<string, Destination>>();
   for (const r of list as Raw[]) {
     const airport = isIata(r?.destination_airport) ? r.destination_airport : r?.destination;
     const price = num(r?.price);
@@ -73,11 +79,14 @@ export function normalizeTravelpayouts(raw: unknown): Destination[] {
     if (HIDDEN_AIRPORTS.has(airport) || HIDDEN_AIRLINES.has(text(r.airline))) continue;
     const nonstop = r.transfers === 0 && r.return_transfers === 0;
     const adjusted = Math.round(nonstop ? price * TRAVELPAYOUTS_ADJUST : price);
-    const prev = best.get(airport);
-    // Prefer a nonstop fare over a connecting one, then the cheaper
+    const options = byAirport.get(airport) ?? new Map<string, Destination>();
+    byAirport.set(airport, options);
+    // One option per pair of dates: a nonstop fare beats a connecting one, then the cheaper wins
+    const key = `${outDate}_${retDate}`;
+    const prev = options.get(key);
     const prevNonstop = prev?.estimate.confidence === 'estimate';
     if (prev && (prevNonstop !== nonstop ? prevNonstop : prev.estimate.price <= adjusted)) continue;
-    best.set(airport, {
+    options.set(key, {
       airport,
       city: airport,
       estimate: {
@@ -89,10 +98,54 @@ export function normalizeTravelpayouts(raw: unknown): Destination[] {
         nights: nightsBetween(outDate, retDate),
         stops: num(r.transfers),
         airline: text(r.airline) || undefined,
+        outTime: clockOf(text(r.departure_at)),
+        retTime: clockOf(text(r.return_at)),
       },
     });
   }
-  return [...best.values()].sort((a, b) => a.estimate.price - b.estimate.price);
+  const rank = (d: Destination) => (d.estimate.confidence === 'estimate' ? 0 : 1);
+  const out: Destination[] = [];
+  for (const options of byAirport.values()) {
+    out.push(...[...options.values()].sort((a, b) => rank(a) - rank(b) || a.estimate.price - b.estimate.price).slice(0, OPTIONS_PER_AIRPORT));
+  }
+  return out.sort((a, b) => a.estimate.price - b.estimate.price || a.airport.localeCompare(b.airport));
+}
+
+/** How many dates are kept per airport from one answer of one-way fares. */
+export const ONE_WAYS_PER_AIRPORT = 10;
+
+/**
+ * Travelpayouts one-way fares → OneWay[]. `dir` says which way they go: 'out' = from the departure airport
+ * (the other end is where you land), 'back' = to the departure airport (the other end is where you leave from).
+ */
+export function normalizeOneWays(raw: unknown, dir: 'out' | 'back'): OneWay[] {
+  const list = (raw as Raw)?.data;
+  if (!Array.isArray(list)) return [];
+  const byAirport = new Map<string, Map<string, OneWay>>();
+  for (const r of list as Raw[]) {
+    const airport = dir === 'out' ? (isIata(r?.destination_airport) ? r.destination_airport : r?.destination) : isIata(r?.origin_airport) ? r.origin_airport : r?.origin;
+    const price = num(r?.price);
+    const date = text(r?.departure_at).slice(0, 10);
+    if (!isIata(airport) || price == null || price <= 0 || !isDate(date)) continue;
+    if (HIDDEN_AIRPORTS.has(airport) || HIDDEN_AIRLINES.has(text(r.airline))) continue;
+    const nonstop = r.transfers === 0;
+    const adjusted = Math.round(nonstop ? price * TRAVELPAYOUTS_ADJUST : price);
+    const dates = byAirport.get(airport) ?? new Map<string, OneWay>();
+    byAirport.set(airport, dates);
+    const prev = dates.get(date);
+    const prevNonstop = prev?.confidence === 'estimate';
+    if (prev && (prevNonstop !== nonstop ? prevNonstop : prev.price <= adjusted)) continue;
+    dates.set(date, {
+      airport, date, time: clockOf(text(r.departure_at)), price: adjusted, stops: num(r.transfers),
+      airline: text(r.airline) || undefined, confidence: nonstop ? 'estimate' : 'rough',
+    });
+  }
+  const rank = (o: OneWay) => (o.confidence === 'estimate' ? 0 : 1);
+  const out: OneWay[] = [];
+  for (const dates of byAirport.values()) {
+    out.push(...[...dates.values()].sort((a, b) => rank(a) - rank(b) || a.price - b.price).slice(0, ONE_WAYS_PER_AIRPORT));
+  }
+  return out.sort((a, b) => a.price - b.price || a.airport.localeCompare(b.airport) || a.date.localeCompare(b.date));
 }
 
 function toLeg(f: Raw): Leg | null {

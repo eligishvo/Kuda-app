@@ -4,7 +4,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Usage } from '../../shared/types';
 import { priceText, Result, Results, stopsText } from '../results/results';
-import { shortDate } from '../search/search';
+import { daysText, shortDate } from '../search/search';
 import { FONTS, Theme, TOUCH } from '../theme/themes';
 
 type Props = {
@@ -22,7 +22,8 @@ type Props = {
   onOpen: (r: Result) => void;
   /** Back to choosing destinations. */
   onEdit: () => void;
-  onRefresh: () => void;
+  /** Open the full list with dates, times and filters. */
+  onList: () => void;
 };
 
 const KIND_NOTE: Record<Result['kind'], string> = {
@@ -32,7 +33,7 @@ const KIND_NOTE: Record<Result['kind'], string> = {
   none: 'No estimate for your dates',
 };
 
-export function ResultsSheet({ theme: t, results, loading, progress, error, usage, budget, focused, onPick, onOpen, onEdit, onRefresh }: Props) {
+export function ResultsSheet({ theme: t, results, loading, progress, error, usage, budget, focused, onPick, onOpen, onEdit, onList }: Props) {
   const insets = useSafeAreaInsets();
   const list = results?.list ?? [];
   const priced = list.filter((r) => r.estimate).length;
@@ -43,7 +44,7 @@ export function ResultsSheet({ theme: t, results, loading, progress, error, usag
           {loading ? progress || 'Checking prices…' : `${priced} within $${budget}`}
         </Text>
         <View style={styles.buttons}>
-          <Small theme={t} label="Refresh" onPress={onRefresh} disabled={loading} />
+          <Small theme={t} label="Full list" onPress={onList} />
           <Small theme={t} label="Destinations" onPress={onEdit} />
         </View>
       </View>
@@ -78,7 +79,7 @@ export function ResultsSheet({ theme: t, results, loading, progress, error, usag
                 <Text style={[styles.detail, { color: t.muted }]} numberOfLines={1}>{r.name}</Text>
                 <Text style={[styles.detail, { color: t.muted }]} numberOfLines={1}>
                   {e
-                    ? [`${shortDate(e.outDate)} – ${shortDate(e.retDate)}`, `${e.nights} nights`, stopsText(e.stops), e.airline, KIND_NOTE[r.kind]].filter(Boolean).join(' · ')
+                    ? [`${shortDate(e.outDate)} – ${shortDate(e.retDate)}`, daysText(e.nights), stopsText(e.stops), e.airline, KIND_NOTE[r.kind]].filter(Boolean).join(' · ')
                     : KIND_NOTE.none}
                 </Text>
               </View>

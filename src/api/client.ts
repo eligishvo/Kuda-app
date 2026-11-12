@@ -1,6 +1,6 @@
 // Talks to the Kuda Worker. The Worker's address and the app token are typed in once on the debug screen and
 // kept on the phone (the token is never committed to the repo). Kept free of React so it can be tested.
-import { ApiResult, Destination, Itinerary, Usage } from '../../shared/types';
+import { ApiResult, Destination, Itinerary, OneWay, Usage } from '../../shared/types';
 
 export type Connection = { url: string; token: string };
 
@@ -34,6 +34,8 @@ export const api = {
     get<Destination[]>(c, `/explore${query(p)}`, f),
   estimates: (c: Connection, p: { origin: string; from: string; to: string }, f?: typeof fetch) =>
     get<Destination[]>(c, `/estimates${query(p)}`, f),
+  oneWays: (c: Connection, p: { origin: string; month: string; dir: 'out' | 'back' }, f?: typeof fetch) =>
+    get<OneWay[]>(c, `/oneways${query(p)}`, f),
   flights: (c: Connection, p: FlightQuery, f?: typeof fetch) =>
     get<Itinerary[]>(c, `/flights${query({ ...p, back: p.back && p.back !== p.dest ? p.back : undefined })}`, f),
   returns: (c: Connection, p: FlightQuery & { departureToken: string }, f?: typeof fetch) =>

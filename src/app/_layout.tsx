@@ -9,7 +9,9 @@ import { StatusBar } from 'expo-status-bar';
 import { View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { ResultsProvider } from '../results/useResults';
 import { SearchProvider } from '../search/SearchContext';
+import { SelectionProvider } from '../selection/useSelection';
 import { ThemeProvider, useTheme } from '../theme/ThemeContext';
 import { FONTS } from '../theme/themes';
 
@@ -26,7 +28,8 @@ function Screens() {
         }}
       >
         <Stack.Screen name="index" options={{ headerShown: false }} />
-        <Stack.Screen name="search" options={{ title: 'Trip details' }} />
+        <Stack.Screen name="search" options={{ title: 'Search flights' }} />
+        <Stack.Screen name="results" options={{ title: 'Results' }} />
         <Stack.Screen name="destination" options={{ title: 'Flights' }} />
         <Stack.Screen name="planner" options={{ title: 'Planner' }} />
         <Stack.Screen name="settings" options={{ title: 'Settings' }} />
@@ -46,7 +49,11 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <ThemeProvider>
           <SearchProvider>
-            <Screens />
+            <SelectionProvider>
+              <ResultsProvider>
+                <Screens />
+              </ResultsProvider>
+            </SelectionProvider>
           </SearchProvider>
         </ThemeProvider>
       </SafeAreaProvider>

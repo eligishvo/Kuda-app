@@ -1,0 +1,12 @@
+{
+  "success": true,
+  "currency": "usd",
+  "data": [
+    { "origin": "TLV", "destination": "ATH", "origin_airport": "TLV", "destination_airport": "ATH", "price": 50, "airline": "A3", "departure_at": "2026-12-07T06:30:00+02:00", "transfers": 0 },
+    { "origin": "TLV", "destination": "ATH", "origin_airport": "TLV", "destination_airport": "ATH", "price": 60, "airline": "W6", "departure_at": "2026-12-09T14:00:00+02:00", "transfers": 0 },
+    { "origin": "TLV", "destination": "SKG", "origin_airport": "TLV", "destination_airport": "SKG", "price": 70, "airline": "A3", "departure_at": "2026-12-08T09:00:00+02:00", "transfers": 1 },
+    { "origin": "TLV", "destination": "FCO", "origin_airport": "TLV", "destination_airport": "FCO", "price": 80, "airline": "W6", "departure_at": "2026-12-10T05:00:00+02:00", "transfers": 0 },
+    { "origin": "TLV", "destination": "AER", "origin_airport": "TLV", "destination_airport": "AER", "price": 90, "airline": "A4", "departure_at": "2026-12-10T05:00:00+02:00", "transfers": 0 },
+    { "origin": "TLV", "destination": "XXX", "price": 0, "departure_at": "bad" }
+  ]
+}

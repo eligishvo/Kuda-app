@@ -33,7 +33,7 @@ const SHOWN = 5;
 export default function DestinationScreen() {
   const t = useTheme();
   const { search } = useSearch();
-  const params = useLocalSearchParams<{ code?: string; pairs?: string }>();
+  const params = useLocalSearchParams<{ code?: string; pairs?: string; back?: string }>();
   const code = (params.code ?? '').toUpperCase();
   const airport = airportByCode(code);
   const origin = search.departureAirports[0];
@@ -47,7 +47,8 @@ export default function DestinationScreen() {
   const [usage, setUsage] = useState<Usage | null>(null);
   const [outbound, setOutbound] = useState<Record<string, Loaded>>({});
   /** The airport to fly home from: the arrival airport unless the user picks another. */
-  const [back, setBack] = useState(code);
+  const firstBack = /^[A-Z]{3}$/.test((params.back ?? '').toUpperCase()) ? (params.back as string).toUpperCase() : code;
+  const [back, setBack] = useState(firstBack);
   const [finding, setFinding] = useState(false);
   const [typed, setTyped] = useState('');
   const [selection] = useSelection();
@@ -85,10 +86,11 @@ export default function DestinationScreen() {
         return;
       }
       setConn(c);
-      checked.current.add(code);
-      for (const p of pairs) await check(c, code, p);
+      // Opened from a "home from another airport" result, that combination is checked instead of the round trip
+      checked.current.add(firstBack);
+      for (const p of pairs) await check(c, firstBack, p);
     })();
-  }, [pairs, check, code]);
+  }, [pairs, check, firstBack]);
 
   // Choosing another airport to fly back from checks the same dates again for that combination
   const flyBackFrom = async (from: string) => {

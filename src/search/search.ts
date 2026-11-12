@@ -14,6 +14,10 @@ export type Search = {
   adults: number;
   /** Most to pay per person for the round trip, in US dollars. */
   budget: number;
+  /** Only show flights without a stop. */
+  nonstopOnly: boolean;
+  /** Also offer trips that fly into one airport and home from another. */
+  mixAirports: boolean;
 };
 
 /** The one place to change the starting budget. */
@@ -39,6 +43,8 @@ export function defaultSearch(today: DateText): Search {
     maxNights: 9,
     adults: 1,
     budget: DEFAULT_BUDGET,
+    nonstopOnly: false,
+    mixAirports: true,
   };
 }
 
@@ -82,6 +88,8 @@ export function sanitizeSearch(raw: unknown, today: DateText, airportsOf: (cc: s
     maxNights,
     adults: clamp(whole(r.adults, d.adults), LIMITS.adults.min, LIMITS.adults.max),
     budget: clamp(whole(r.budget, d.budget), LIMITS.budget.min, LIMITS.budget.max),
+    nonstopOnly: r.nonstopOnly === true,
+    mixAirports: r.mixAirports !== false,
   };
 }
 
@@ -93,10 +101,15 @@ export function shortDate(d: DateText): string {
   return `${Number(d.slice(8, 10))} ${MONTHS[Number(d.slice(5, 7)) - 1]}`;
 }
 
-export const nightsText = (s: Search) => (s.minNights === s.maxNights ? `${s.minNights} nights` : `${s.minNights}–${s.maxNights} nights`);
+/**
+ * Trip length in words. A "day" here is one night away: leaving on the 7th and coming back on the 14th is
+ * a 7-day trip (the code calls these nights, the screens say days).
+ */
+export const daysText = (n: number) => (n === 1 ? '1 day' : `${n} days`);
+export const nightsText = (s: Search) => (s.minNights === s.maxNights ? daysText(s.minNights) : `${s.minNights}–${s.maxNights} days`);
 export const travelersText = (n: number) => (n === 1 ? '1 adult' : `${n} adults`);
 
-/** The one-line summary shown on the map, e.g. "TLV · 26 Nov – 11 Jan · 5–9 nights · 1 adult · up to $400". */
+/** The one-line summary shown on the map, e.g. "TLV · 26 Nov – 11 Jan · 5–9 days · 1 adult · up to $400". */
 export function summary(s: Search): string {
   return [
     s.departureAirports.join(', '),

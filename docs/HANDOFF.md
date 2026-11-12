@@ -5,11 +5,13 @@ Spec: `docs/BRIEF.md`. Rules: `AGENTS.md`.
 
 ## Status (2026-11-12)
 
-**All phases of the brief are written (1, 2, 2b, 3, 4 and 5), plus two owner requests from 2026-11-12: an
-Adults setting and flying back from a different airport.** Phases 1 and 2 were run by the owner on his phone in
-Expo Go and against the deployed Worker with real keys and worked. Everything after that passes the checks
-(typecheck, 110 tests, Android bundle, Worker dry-run build) but has **not been tried on the phone yet**.
-The first Expo update and Android preview build were started by the commit that added this note.
+**All phases of the brief are written, plus the owner's requests of 2026-11-12** (Adults setting, flying back
+from another airport, city names on the map, a search form with a Search button, a results list with filters,
+mixed-airport options in the list). Phases 1 and 2 were run by the owner on his phone and against the deployed
+Worker and worked; he has since used later versions enough to ask for changes, but gave no pass/fail report.
+The newest round (this section's last block) passes the checks (typecheck, 129 tests, Android bundle, Worker
+dry-run build) and has **not been tried on the phone yet**. An Android preview app (arm64) exists; pushes to
+`main` reach it as updates.
 
 Built in phase 1:
 - Expo SDK 58 project (`kuda`, owner `elidesigninc`), Expo Router, TypeScript, vitest, same versions as Mechanoplanner.
@@ -83,6 +85,28 @@ Added after the brief (owner's requests):
   Open-jaw prices exist only as live checks: the map's price pins and list are always plain round trips, because
   Google Explore and Travelpayouts only price round trips.
 
+Added 2026-11-12, second round (owner's requests):
+- **City names on the map** (`src/map/labels.ts`, `CityLabels.tsx`): under the airport dots. About 16 major
+  hubs on the globe, more large cities while it flattens, and on the flat map "City CODE" for up to 44 airports.
+  Selected, departure and priced airports are always named. Names never overlap and stay out from under the
+  panels. They are re-chosen when the map has moved about 50 pixels, not every frame.
+- **City names fixed at the source:** OurAirports names the town an airport stands in ("Spata-Artemida" for
+  Athens, "Ferno" for Milan). `scripts/build-map-data.mjs` now takes the city an airport serves from OpenFlights.
+- **Search screen** (`src/app/search.tsx`, title "Search flights"): adults, departure, possible dates, trip
+  length in days, budget, options (nonstop only; include flying home from a different airport), then a **Search**
+  button that fetches prices and opens the results list. The map's "Search flights" button opens this screen.
+- **Results list** (`src/app/results.tsx`): one line per destination and pair of dates with leave and return
+  dates, take-off times when the source has them, trip length in days and the total cost for all adults. Sort by
+  cheapest, earliest or shortest; filters for price, trip length, nonstop, Google prices only and mixed airports.
+  A line opens the live flight check for that destination and those dates.
+- **Mixed-airport options in the list:** `buildMixed` pairs a one-way fare out to airport A with a one-way fare
+  home from airport B (Worker `/oneways`, free Travelpayouts calls). With destinations selected A and B are both
+  among them; with none, B is within 400 km of A. Shown as "Home from …", priced as two one-way tickets, and
+  switched off by the search option or the list's filter. Opening one starts the live check for that pair.
+- Travelpayouts answers now keep up to eight dated options per airport (they used to keep one), with take-off
+  times; selection and results are shared between screens through `SelectionProvider` and `ResultsProvider`.
+- Wording: trip length is in **days** on screen (the code still says nights: return date minus leave date).
+
 ## How to test on a phone
 
 1. In the repo folder: `git pull`, `npm install`, `npx expo start`.
@@ -106,6 +130,15 @@ After a search, tap a result row, then "Compare flights". Three date rows fill i
 searches). Tap a date row to see its outbound flights; tap one ("See returns", 1 search); tap a return
 ("Choose"): the Planner opens with both flights. Go back to the map, open Settings → Chosen flights: the same
 trip is there. For a "no estimate" airport the button says "Check flights".
+
+## How to test the second round
+
+1. Map: city names appear under airports; more as you pinch in, with codes once the map is flat.
+2. Tap "Search flights" on the map: set adults, dates, trip length (e.g. 5–8 days), budget, options; tap Search.
+3. Results list: each line has Leave / Return / Trip / total. Try Cheapest / Earliest / Shortest, then Filters:
+   lower the price, narrow the days, Nonstop only, and switch "Home from a different airport" off and on.
+4. Tap a line: the live check opens for those dates (and for that pair of airports on a "Home from" line).
+5. "Map" goes back to the globe; "Prices on map" shows the pins.
 
 ## How to test flying back from another airport
 
@@ -141,6 +174,11 @@ rings on the map should follow. Close and reopen the app: the search should stil
 ## Not verified
 
 - Phase 2b on a phone (calendar taps, the country list, the summary pill's size on a small screen).
+- The second round on a phone: city names (legibility, how they feel while dragging), the search and results
+  screens, and the mixed-airport options against real Travelpayouts one-way answers (`/oneways` was only run in
+  tests; calling Travelpayouts with only a destination is documented but untried with the owner's token).
+- Times in the list come from Travelpayouts only. Google Explore gives dates but no times, so Google-priced
+  lines say "time: tap" until the live check.
 - Multi-city answers from Google: the open-jaw calls were only run in tests with made-up answers. If the real
   second-leg answer has a different shape (for example no price on the options), the return list will show it.
 - Phases 4 and 5 on a phone and against real answers: the destination screen's sequence of live checks, the
@@ -165,6 +203,13 @@ rings on the map should follow. Close and reopen the app: the search should stil
 - **Is Google's price per person or for everyone (adults > 1)?** Still open: the owner said prices "seem to
   work" but didn't report the two numbers. Compare "Flights" and "Flights ×2 adults" on the debug screen before
   phase 4 shows totals. The app asks Explore and estimates with 1 adult, so those prices are per person.
+- **OpenFlights city names** are under the Open Database License (attribution, shown in Settings → About;
+  share-alike for the derived data file). Fine for a personal app; if the app is ever published commercially,
+  review it or swap in another source. Reverting is one line in `scripts/build-map-data.mjs`.
+- **Mixed-airport prices are two separate one-way tickets added together**, as estimates. That is a real way to
+  book it, but Google's multi-city price (the live check) can differ.
+- **"Days" = nights between the two dates.** The owner said "5–8 days"; the calendar meaning is return date
+  minus leave date.
 - **Several departure airports:** the search allows more than one, but prices are fetched from the first one
   only (one origin per call; more would multiply the searches). Offered to the owner, no answer yet.
 - **Country searches** (`arrival_area_id`) are not used: they need Google's id for each country and failed for
@@ -204,6 +249,10 @@ None recorded yet (nothing has run on a phone).
 
 ## Changelog
 
+- **2026-11-12** — Second round of owner's requests: city names on the map (with served-city names from
+  OpenFlights), search form with a Search button and options, results list with dates, times, days, total cost,
+  sorting and filters, mixed-airport options from one-way fares (Worker `/oneways`). 129 tests. Published as an
+  update; the Worker redeploys with it. Not yet on a phone.
 - **2026-11-12** — The first Android build failed in Gradle: the compiler was killed (out of memory on Expo's
   free build machine) while compiling Skia for the x86 emulator format. The preview build now compiles only
   for arm64 phones (`gradleCommand` in `eas.json`), which is every current Android phone but not emulators or

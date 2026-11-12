@@ -5,7 +5,7 @@
 // It is written against small interfaces (a key-value store and a fetch function) so the tests can run it
 // in Node with fakes; worker/src/index.ts plugs in the real Cloudflare ones.
 import { isDate } from '../../shared/dates';
-import { normalizeExplore, normalizeFlights, normalizeTravelpayouts } from '../../shared/normalize';
+import { normalizeExplore, normalizeFlights, normalizeOneWays, normalizeTravelpayouts } from '../../shared/normalize';
 import { ApiResult, Usage } from '../../shared/types';
 
 /** The part of Cloudflare KV that the Worker uses. */
@@ -99,6 +99,18 @@ async function travelpayouts(env: Env, deps: Deps, origin: string, from: string,
   return body;
 }
 
+/** One-way fares for a month: from the airport to everywhere ('out') or from everywhere to it ('back'). */
+async function oneWays(env: Env, deps: Deps, airport: string, month: string, dir: 'out' | 'back'): Promise<any> {
+  if (!env.TRAVELPAYOUTS_TOKEN) throw new Problem('The Worker has no TRAVELPAYOUTS_TOKEN secret yet.', 500);
+  const url = new URL('https://api.travelpayouts.com/aviasales/v3/prices_for_dates');
+  const params = { [dir === 'out' ? 'origin' : 'destination']: airport, departure_at: month, one_way: 'true', unique: 'false', sorting: 'price', limit: '1000', currency: 'usd', token: env.TRAVELPAYOUTS_TOKEN };
+  for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
+  const res = await deps.fetch(url.toString());
+  const body: any = await res.json().catch(() => null);
+  if (!res.ok || body == null || body.success === false) throw new Problem(`Travelpayouts: ${body?.error ?? res.status}`, 502);
+  return body;
+}
+
 /** Answers from the cache when it can; otherwise runs `load`, saves the result and answers with it. */
 async function cached(env: Env, deps: Deps, key: string, ttl: number, load: () => Promise<{ data: unknown; empty?: boolean }>): Promise<Response> {
   const hit = await env.CACHE.get(key);
@@ -155,6 +167,17 @@ export async function handle(request: Request, env: Env, deps: Deps = REAL): Pro
       if (!isMonth(from) || !isMonth(to)) throw new Problem('from and to must be months like 2026-12.', 400);
       return await cached(env, deps, `estimates:${origin}:${from}:${to}`, TTL.estimates, async () => {
         const data = normalizeTravelpayouts(await travelpayouts(env, deps, origin, from, to));
+        return { data, empty: data.length === 0 };
+      });
+    }
+
+    if (url.pathname === '/oneways') {
+      const month = q.get('month');
+      const dir = q.get('dir');
+      if (!isMonth(month)) throw new Problem('month must be like 2026-12.', 400);
+      if (dir !== 'out' && dir !== 'back') throw new Problem('dir must be out or back.', 400);
+      return await cached(env, deps, `oneways:${origin}:${month}:${dir}`, TTL.estimates, async () => {
+        const data = normalizeOneWays(await oneWays(env, deps, origin, month, dir), dir);
         return { data, empty: data.length === 0 };
       });
     }

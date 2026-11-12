@@ -2,8 +2,11 @@
 // (only needed again to refresh airports or borders).
 //   - countries: Natural Earth (via the world-atlas package), 110m for the globe and 50m for zoomed-in
 //   - airports: OurAirports airports.csv (large and medium airports with scheduled service and an IATA code)
+//   - city names: OpenFlights airports.dat, because it names the city an airport serves ("Athens", "Milan")
+//     where OurAirports names the town it stands in ("Spata-Artemida", "Ferno")
 // Coordinates are stored as whole numbers of 0.01° to keep the files small.
-// Usage: node scripts/build-map-data.mjs [path/to/airports.csv]   (downloads the CSV when no path is given)
+// Usage: node scripts/build-map-data.mjs [path/to/airports.csv] [path/to/openflights-airports.dat]
+//        (each file is downloaded when its path is not given)
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
@@ -16,6 +19,7 @@ const iso = require('i18n-iso-countries');
 const here = path.dirname(fileURLToPath(import.meta.url));
 const out = path.join(here, '..', 'src', 'map', 'data');
 const AIRPORTS_URL = 'https://raw.githubusercontent.com/davidmegginson/ourairports-data/main/airports.csv';
+const CITIES_URL = 'https://raw.githubusercontent.com/jpatokal/openflights/master/data/airports.dat';
 
 // Places Natural Earth draws without an ISO number
 const BY_NAME = { Kosovo: 'XK', 'N. Cyprus': 'CY-N', Somaliland: 'SO-S' };
@@ -79,7 +83,28 @@ function parseCsv(text) {
   return rows;
 }
 
-async function airports(file) {
+/** IATA code → the city the airport serves, from OpenFlights (columns: id, name, city, country, IATA, …). */
+async function servedCities(file) {
+  const text = file ? fs.readFileSync(file, 'utf8') : await (await fetch(CITIES_URL)).text();
+  const map = new Map();
+  for (const r of parseCsv(text)) {
+    if (/^[A-Z]{3}$/.test(r[4] ?? '') && r[2]) map.set(r[4], r[2].trim());
+  }
+  return map;
+}
+
+const plain = (s) => s.toLowerCase().replace(/[^a-z]/g, '');
+
+/** The name to show for an airport's city: the city it serves when known, else the town without its bracketed part. */
+function cityName(municipality, served) {
+  const town = municipality.replace(/\s*\(.*\)\s*/g, ' ').trim();
+  if (!served) return town;
+  // Same place, different spelling ("Tel-aviv" / "Tel Aviv"): keep OurAirports' spelling
+  return plain(town) === plain(served) ? town : served;
+}
+
+async function airports(file, citiesFile) {
+  const cities = await servedCities(citiesFile);
   const text = file ? fs.readFileSync(file, 'utf8') : await (await fetch(AIRPORTS_URL)).text();
   const [head, ...rows] = parseCsv(text);
   const col = Object.fromEntries(head.map((h, i) => [h, i]));
@@ -95,7 +120,7 @@ async function airports(file) {
     list.push([
       code,
       r[col.name],
-      r[col.municipality],
+      cityName(r[col.municipality], cities.get(code)),
       r[col.iso_country],
       Math.round(Number(r[col.latitude_deg]) * 1000) / 1000,
       Math.round(Number(r[col.longitude_deg]) * 1000) / 1000,
@@ -111,7 +136,7 @@ const low = countries('countries-110m.json', 1);
 const high = countries('countries-50m.json', Number(process.env.KEEP_50M ?? 0.5));
 fs.writeFileSync(path.join(out, 'countries110.json'), JSON.stringify(low.list));
 fs.writeFileSync(path.join(out, 'countries50.json'), JSON.stringify(high.list));
-const ap = await airports(process.argv[2]);
+const ap = await airports(process.argv[2], process.argv[3]);
 fs.writeFileSync(path.join(out, 'airports.json'), JSON.stringify(ap));
 console.log(`110m: ${low.list.length} countries, ${low.points} points`);
 console.log(`50m: ${high.list.length} countries, ${high.points} points`);

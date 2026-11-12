@@ -12,7 +12,7 @@ type Props = {
   onRemove: (cc: string) => void;
   onClear: () => void;
   /** The main button under the chips (e.g. "Search flights"). */
-  action?: { label: string; onPress: () => void; busy?: boolean; note?: string };
+  action?: { label: string; onPress: () => void; busy?: boolean; note?: string; second?: { label: string; onPress: () => void } };
   /** Set while narrowing one country down to some airports. */
   narrow?: {
     cc: string;
@@ -114,14 +114,25 @@ export function SelectionSheet({ theme: t, chips, onRemove, onClear, action, nar
       )}
       {action && (
         <>
-          <Pressable
-            onPress={action.onPress}
-            disabled={action.busy}
-            accessibilityRole="button"
-            style={[styles.action, { backgroundColor: t.accent, opacity: action.busy ? 0.6 : 1 }]}
-          >
-            <Text style={[styles.actionText, { color: t.buttonText }]}>{action.label}</Text>
-          </Pressable>
+          <View style={styles.actions2}>
+            <Pressable
+              onPress={action.onPress}
+              disabled={action.busy}
+              accessibilityRole="button"
+              style={[styles.action, styles.grow, { backgroundColor: t.accent, opacity: action.busy ? 0.6 : 1 }]}
+            >
+              <Text style={[styles.actionText, { color: t.buttonText }]}>{action.label}</Text>
+            </Pressable>
+            {action.second && (
+              <Pressable
+                onPress={action.second.onPress}
+                accessibilityRole="button"
+                style={[styles.action, styles.secondAction, { backgroundColor: t.chip, borderColor: t.border }]}
+              >
+                <Text style={[styles.actionText, { color: t.text }]}>{action.second.label}</Text>
+              </Pressable>
+            )}
+          </View>
           {action.note ? <Text style={[styles.note, { color: t.muted }]}>{action.note}</Text> : null}
         </>
       )}
@@ -179,7 +190,10 @@ const styles = StyleSheet.create({
   airportText: { flex: 1, paddingVertical: 4 },
   airportCity: { fontFamily: FONTS.bodyMedium, fontSize: 14 },
   airportName: { fontFamily: FONTS.body, fontSize: 12 },
-  action: { borderRadius: 24, minHeight: TOUCH + 4, alignItems: 'center', justifyContent: 'center', marginTop: 10 },
+  actions2: { flexDirection: 'row', gap: 8, marginTop: 10 },
+  grow: { flex: 1 },
+  secondAction: { borderWidth: 1, paddingHorizontal: 16 },
+  action: { borderRadius: 24, minHeight: TOUCH + 4, alignItems: 'center', justifyContent: 'center' },
   actionText: { fontFamily: FONTS.bodyBold, fontSize: 16 },
   note: { fontFamily: FONTS.body, fontSize: 12, lineHeight: 17, paddingTop: 6 },
 });

@@ -83,22 +83,41 @@ describe('SerpApi Explore', () => {
 
 describe('Travelpayouts', () => {
   const list = normalizeTravelpayouts(travelpayouts);
+  const of = (airport: string) => list.filter((d) => d.airport === airport);
 
-  it('keeps the best fare per airport and hides Russian routes and broken rows', () => {
-    expect(list.map((d) => d.airport)).toEqual(['LCA', 'BUD', 'LIS']);
+  it('keeps one option per pair of dates, cheapest first, and hides Russian routes and broken rows', () => {
+    expect(list.map((d) => `${d.airport} ${d.estimate.price}`)).toEqual(['LCA 61', 'LCA 67', 'BUD 90', 'BUD 110', 'LIS 310']);
   });
 
-  it('raises nonstop fares by 10% and marks them as estimates', () => {
-    expect(list[0].estimate).toMatchObject({ source: 'travelpayouts', confidence: 'estimate', price: 61, outDate: '2026-12-17', retDate: '2026-12-20', nights: 3, stops: 0 });
-    // 55 × 1.1 = 60.5 → 61; the cheaper of the two Larnaca fares won
-  });
-
-  it('prefers a nonstop fare over a cheaper connecting one', () => {
-    expect(list[1].estimate).toMatchObject({ confidence: 'estimate', price: 110, airline: 'W6' });
+  it('raises nonstop fares by 10%, marks them as estimates and keeps their take-off times', () => {
+    expect(of('LCA')[0].estimate).toEqual({
+      source: 'travelpayouts', confidence: 'estimate', price: 61, outDate: '2026-12-17', retDate: '2026-12-20', nights: 3, stops: 0,
+      airline: 'W6', outTime: '10:00', retTime: '12:00',
+    });
+    // 55 × 1.1 = 60.5 → 61, and the other Larnaca dates: 61 × 1.1 → 67
+    expect(of('LCA')[1].estimate).toMatchObject({ price: 67, outDate: '2026-12-03' });
   });
 
   it('marks connecting fares as rough and leaves their price alone', () => {
-    expect(list[2].estimate).toMatchObject({ confidence: 'rough', price: 310, stops: 1 });
+    expect(of('BUD').map((d) => d.estimate.confidence)).toEqual(['rough', 'estimate']);
+    expect(of('LIS')[0].estimate).toMatchObject({ confidence: 'rough', price: 310, stops: 1, outTime: '08:00' });
+  });
+
+  it('on the same dates a nonstop fare replaces a cheaper connecting one', () => {
+    const same = normalizeTravelpayouts({ data: [
+      { destination_airport: 'BUD', price: 90, departure_at: '2026-12-08T05:15:00+02:00', return_at: '2026-12-14T21:30:00+01:00', transfers: 1, return_transfers: 1 },
+      { destination_airport: 'BUD', price: 100, departure_at: '2026-12-08T07:00:00+02:00', return_at: '2026-12-14T20:00:00+01:00', transfers: 0, return_transfers: 0 },
+    ] });
+    expect(same).toHaveLength(1);
+    expect(same[0].estimate).toMatchObject({ confidence: 'estimate', price: 110, outTime: '07:00' });
+  });
+
+  it('keeps at most eight options per airport', () => {
+    const data = Array.from({ length: 20 }, (_, i) => ({
+      destination_airport: 'ATH', price: 100 + i, departure_at: `2026-12-${String(i + 1).padStart(2, '0')}T06:00:00+02:00`,
+      return_at: `2026-12-${String(i + 6).padStart(2, '0')}T20:00:00+02:00`, transfers: 0, return_transfers: 0,
+    }));
+    expect(normalizeTravelpayouts({ data })).toHaveLength(8);
   });
 
   it('copes with an empty or failed answer', () => {

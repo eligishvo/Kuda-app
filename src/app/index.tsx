@@ -62,15 +62,22 @@ export default function Home() {
     [selection],
   );
 
-  // Prices: fetched when the user asks, re-filtered whenever the destinations or the budget change
-  const selectedCodes = useMemo(() => selectedAirports(selection, airportCodesIn), [selection]);
-  const found = useResults(search, selectedCodes);
+  // Prices: fetched when the user asks (on the search screen), shared with the results list
+  const found = useResults();
   const pins: Pin[] = useMemo(() => {
     if (!showResults || !found.results) return [];
     return found.results.list.map((r, rank) => ({
       code: r.airport, lon: r.lon, lat: r.lat, label: priceText(r, true), kind: r.kind, rank, focused: r.airport === focused,
     }));
   }, [showResults, found.results, focused]);
+
+  // Airports whose city name always shows on the map: the ones you fly from, the selected ones, the priced ones
+  const named = useMemo(
+    () => new Set([...search.departureAirports, ...selectedAirports(selection, airportCodesIn), ...pins.map((p) => p.code)]),
+    [search.departureAirports, selection, pins],
+  );
+  // Roughly how much of the screen the top bar and the bottom panel cover
+  const covered = useMemo(() => ({ top: insets.top + 130, bottom: insets.bottom + (showResults ? 330 : 190) }), [insets.top, insets.bottom, showResults]);
 
   const onHit = useCallback(
     (hit: Hit, flat: boolean) => {
@@ -105,12 +112,6 @@ export default function Home() {
   const chipList = useMemo(() => chips(selection, countryName, airportCodesIn, airportLabel), [selection]);
   const narrowing = narrowCc != null && selection[narrowCc] ? narrowCc : null;
 
-  const startSearch = () => {
-    setNarrowCc(null);
-    setFocused(null);
-    setShowResults(true);
-    found.run();
-  };
   const pickResult = (r: Result) => {
     setFocused(r.airport);
     flyTo(view, r.lon, r.lat);
@@ -133,6 +134,8 @@ export default function Home() {
         flagsHigh={flagsHigh}
         airportFlags={airportFlags}
         departures={departures}
+        named={named}
+        covered={covered}
         onHit={onHit}
       />
       <View style={[styles.top, { top: insets.top + 8 }]} pointerEvents="box-none">
@@ -178,7 +181,7 @@ export default function Home() {
           onPick={pickResult}
           onOpen={openDestination}
           onEdit={() => setShowResults(false)}
-          onRefresh={found.run}
+          onList={() => router.push('/results')}
         />
       ) : (
         <SelectionSheet
@@ -190,9 +193,10 @@ export default function Home() {
             update(() => EMPTY);
           }}
           action={{
-            label: found.results && !found.stale ? 'Show results' : chipList.length === 0 ? 'Search everywhere' : 'Search flights',
-            onPress: found.results && !found.stale ? () => setShowResults(true) : startSearch,
-            note: found.results && !found.stale ? 'Prices already fetched. Use Refresh there to search again.' : 'Uses a few of today’s price searches; repeats within 12 hours are free.',
+            label: 'Search flights',
+            onPress: () => router.push('/search'),
+            note: found.results && !found.stale ? undefined : chipList.length === 0 ? 'Nothing picked: the search will look everywhere.' : undefined,
+            second: found.results && !found.stale ? { label: 'Prices on map', onPress: () => { setNarrowCc(null); setShowResults(true); } } : undefined,
           }}
           narrow={
             narrowing
