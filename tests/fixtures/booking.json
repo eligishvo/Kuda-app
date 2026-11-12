@@ -1,0 +1,12 @@
+{
+  "selected_flights": [],
+  "baggage_prices": { "together": ["1 free carry-on", "1st checked bag: 45"] },
+  "booking_options": [
+    { "together": { "book_with": "Aegean", "airline": true, "airline_logos": ["x"], "marketed_as": ["A3 929"], "price": 142, "option_title": "Economy Light", "baggage_prices": ["1 free carry-on"], "booking_request": { "url": "https://www.google.com/travel/clk/f", "post_data": "secret" } } },
+    { "together": { "book_with": "Kiwi.com", "price": 131, "baggage_prices": [] } },
+    { "together": { "book_with": "Gotogate", "airline": false, "price": 138 } },
+    { "departing": { "book_with": "Wizz Air", "airline": true, "price": 60 }, "returning": { "book_with": "Ryanair", "airline": true, "price": 55 } },
+    { "together": { "book_with": "Call to book", "booking_phone": "+1 800 000" } },
+    { "together": {} }
+  ]
+}

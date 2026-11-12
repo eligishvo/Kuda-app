@@ -3,7 +3,7 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Usage } from '../../shared/types';
-import { priceText, Result, Results, stopsText } from '../results/results';
+import { originOf, priceText, Result, Results, stopsText } from '../results/results';
 import { daysText, shortDate } from '../search/search';
 import { FONTS, Theme, TOUCH } from '../theme/themes';
 
@@ -26,11 +26,11 @@ type Props = {
   onList: () => void;
 };
 
-const KIND_NOTE: Record<Result['kind'], string> = {
-  live: '',
-  estimate: 'estimate, a few days old',
-  rough: 'rough, with a connection',
-  none: 'No estimate for your dates',
+/** Where a result's price comes from, e.g. "Google Flights, checked" or "Aviasales, estimate". */
+const sourceNote = (kind: Result['kind']) => {
+  if (kind === 'none') return 'No estimate for your dates';
+  const o = originOf(kind);
+  return `${o.source}, ${o.status.toLowerCase()}`;
 };
 
 export function ResultsSheet({ theme: t, results, loading, progress, error, usage, budget, focused, onPick, onOpen, onEdit, onList }: Props) {
@@ -79,8 +79,8 @@ export function ResultsSheet({ theme: t, results, loading, progress, error, usag
                 <Text style={[styles.detail, { color: t.muted }]} numberOfLines={1}>{r.name}</Text>
                 <Text style={[styles.detail, { color: t.muted }]} numberOfLines={1}>
                   {e
-                    ? [`${shortDate(e.outDate)} – ${shortDate(e.retDate)}`, daysText(e.nights), stopsText(e.stops), e.airline, KIND_NOTE[r.kind]].filter(Boolean).join(' · ')
-                    : KIND_NOTE.none}
+                    ? [`${shortDate(e.outDate)} – ${shortDate(e.retDate)}`, daysText(e.nights), stopsText(e.stops), sourceNote(r.kind)].filter(Boolean).join(' · ')
+                    : sourceNote('none')}
                 </Text>
               </View>
               <View style={styles.right}>

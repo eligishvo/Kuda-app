@@ -222,6 +222,13 @@ export default function DestinationScreen() {
           );
         })}
       </View>
+      <Text style={[styles.small, { color: t.price }]}>
+        Source: Google Flights, checked live{pairs.some((p) => outbound[keyOf(back, p)]?.cached) ? ' (some within the last hour)' : ' just now'}.
+      </Text>
+      <Text style={[styles.small, { color: t.muted }]}>
+        Each price is the lowest Google lists for that flight, from the airline or a travel agency. After you choose
+        flights, the Planner can show who sells them.
+      </Text>
       <Text style={[styles.small, { color: t.muted }]}>
         Prices are for the whole trip there and back, as Google shows them for {travelersText(search.adults)}.
         {search.adults > 1 ? ' Whether that is per person or for everyone has not been confirmed yet.' : ''}

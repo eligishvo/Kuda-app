@@ -5,7 +5,7 @@ import { router } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 import { encodePairs } from '../flights/flights';
-import { defaultFilters, filterOptions, Filters, Option, priceText, Sort, stopsText, totalCost } from '../results/results';
+import { defaultFilters, filterOptions, Filters, Option, originOf, priceText, Sort, stopsText, totalCost } from '../results/results';
 import { useResults } from '../results/useResults';
 import { daysText, LIMITS, shortDate, travelersText } from '../search/search';
 import { useSearch } from '../search/SearchContext';
@@ -19,19 +19,13 @@ const SORTS: { id: Sort; label: string }[] = [
   { id: 'length', label: 'Shortest' },
 ];
 
-const NOTE: Record<Option['kind'], string> = {
-  live: 'Google price',
-  estimate: 'Estimate, a few days old',
-  rough: 'Rough estimate',
-  none: '',
-};
-
 export default function ResultsScreen() {
   const t = useTheme();
   const { search } = useSearch();
   const found = useResults();
   const [filters, setFilters] = useState<Filters>(() => defaultFilters(search));
   const [showFilters, setShowFilters] = useState(false);
+  const [showSources, setShowSources] = useState(false);
   // A new search starts again from the search's own budget, trip length and options
   useEffect(() => {
     setFilters(defaultFilters(search));
@@ -68,8 +62,27 @@ export default function ResultsScreen() {
           <Chip key={s.id} theme={t} on={filters.sort === s.id} label={s.label} onPress={() => set({ sort: s.id })} />
         ))}
         <Chip theme={t} on={showFilters} label={showFilters ? 'Hide filters' : 'Filters'} onPress={() => setShowFilters(!showFilters)} />
+        <Chip theme={t} on={showSources} label="Price sources" onPress={() => setShowSources(!showSources)} />
         <Chip theme={t} on={false} label="Map" onPress={() => router.dismissTo('/')} />
       </View>
+
+      {showSources && (
+        <View style={[styles.filters, { backgroundColor: t.panel, borderColor: t.border }]}>
+          {(['live', 'estimate', 'rough'] as const).map((kind) => {
+            const o = originOf(kind);
+            return (
+              <View key={kind} style={styles.sourceRow}>
+                <Badge theme={t} kind={kind} mixed={false} />
+                <Text style={[styles.small, styles.flex, { color: t.muted }]}>{o.detail}</Text>
+              </View>
+            );
+          })}
+          <Text style={[styles.small, { color: t.muted }]}>
+            Tapping a line checks it live on Google Flights. After you choose flights, the Planner can list who sells them
+            (the airline or a travel agency) and each seller’s price.
+          </Text>
+        </View>
+      )}
 
       {showFilters && (
         <View style={[styles.filters, { backgroundColor: t.panel, borderColor: t.border }]}>
@@ -134,9 +147,12 @@ function Row({ theme: t, o, adults, onPress }: { theme: Theme; o: Option; adults
             <Text style={[styles.when, { color: t.text }]}>{daysText(e.nights)}</Text>
           </View>
         </View>
-        <Text style={[styles.small, { color: t.muted }]} numberOfLines={1}>
-          {[stopsText(e.stops), e.airline, NOTE[o.kind], o.back ? 'two one-way tickets' : ''].filter(Boolean).join(' · ')}
-        </Text>
+        <View style={styles.meta}>
+          <Badge theme={t} kind={o.kind} mixed={!!o.back} />
+          <Text style={[styles.small, styles.flex, { color: t.muted }]} numberOfLines={1}>
+            {[stopsText(e.stops), e.airline, o.back ? 'two one-way tickets' : ''].filter(Boolean).join(' · ')}
+          </Text>
+        </View>
       </View>
       <View style={styles.right}>
         <Text style={[styles.price, { color: t.price, opacity: o.kind === 'rough' ? 0.8 : 1 }]}>
@@ -146,6 +162,17 @@ function Row({ theme: t, o, adults, onPress }: { theme: Theme; o: Option; adults
         <Text style={[styles.check, { color: t.text }]}>Flights ›</Text>
       </View>
     </Pressable>
+  );
+}
+
+/** Where the price comes from and whether it was checked: "Google Flights · Checked", "Aviasales · Estimate". */
+function Badge({ theme: t, kind, mixed }: { theme: Theme; kind: Option['kind']; mixed: boolean }) {
+  const o = originOf(kind, mixed);
+  const checked = kind === 'live';
+  return (
+    <View style={[styles.badge, { borderColor: checked ? t.price : t.border, borderStyle: checked ? 'solid' : 'dashed' }]}>
+      <Text style={[styles.tiny, { color: checked ? t.price : t.muted }]}>{o.source} · {o.status}</Text>
+    </View>
   );
 }
 
@@ -193,6 +220,9 @@ const styles = StyleSheet.create({
   chip: { borderWidth: 1, borderRadius: 22, paddingHorizontal: 14, height: TOUCH, alignItems: 'center', justifyContent: 'center' },
   chipText: { fontFamily: FONTS.bodyMedium, fontSize: 13 },
   filters: { borderWidth: 1, borderRadius: 14, padding: 12, gap: 6 },
+  sourceRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  meta: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  badge: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2 },
   toggle: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: TOUCH },
   reset: { alignSelf: 'flex-start', minHeight: TOUCH, justifyContent: 'center' },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: 14, padding: 12 },

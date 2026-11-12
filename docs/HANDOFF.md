@@ -115,6 +115,14 @@ Added 2026-11-12, third round (owner's feedback after using the app: "it seems t
   separate Report screen (`src/app/report.tsx`). The ticket records which screen it was pressed on
   (`whereOf` in `src/report/report.ts`). Settings links to the same screen instead of holding the form.
 
+Added 2026-11-12, fourth round (owner asked where prices come from and who sells them):
+- **Source on every price:** results lines carry a badge, "Google Flights · Checked" (solid) or "Aviasales ·
+  Estimate" / "Aviasales · Rough estimate" (dashed). A "Price sources" button on the results list explains each.
+  The map's results panel and the destination screen say the same in words (`originOf` in `results.ts`).
+- **Who sells it:** on the Planner, "See who sells it (1 search)" lists the sellers Google has for the chosen
+  flights, each marked "Airline, direct" or "Third party (travel agency)", with its price. Worker `/booking`
+  (SerpApi booking options via the return option's `booking_token`), `normalizeSellers`, `Seller` type.
+
 ## How to test on a phone
 
 1. In the repo folder: `git pull`, `npm install`, `npx expo start`.
@@ -187,6 +195,9 @@ rings on the map should follow. Close and reopen the app: the search should stil
   tests; calling Travelpayouts with only a destination is documented but untried with the owner's token).
 - Times in the list come from Travelpayouts only. Google Explore gives dates but no times, so Google-priced
   lines say "time: tap" until the live check.
+- The seller list against a real answer: `/booking` and `normalizeSellers` were only run on a made-up answer
+  shaped like SerpApi's documentation (`together` / `departing` + `returning`, `book_with`, `airline`, `price`).
+  If sellers come back empty or all "third party", compare with the real answer.
 - Multi-city answers from Google: the open-jaw calls were only run in tests with made-up answers. If the real
   second-leg answer has a different shape (for example no price on the options), the return list will show it.
 - Phases 4 and 5 on a phone and against real answers: the destination screen's sequence of live checks, the
@@ -212,10 +223,11 @@ rings on the map should follow. Close and reopen the app: the search should stil
   work" but didn't report the two numbers. Compare "Flights" and "Flights ×2 adults" on the debug screen before
   phase 4 shows totals. The app asks Explore and estimates with 1 adult, so those prices are per person.
 - **Third-party sellers (owner asked 2026-11-12):** prices come from Google Flights (which includes online travel
-  agencies among its partners) and from Aviasales' cache (also a metasearch). The app shows one price per
-  flight, not who sells it. SerpApi can list the sellers of a chosen flight (`booking_token` → `booking_options`,
-  one more search); offered to the owner, not built. Kiwi-only self-transfer combinations and Israeli agencies
-  such as Gulliver are not covered unless Google lists them.
+  agencies among its partners) and from Aviasales' cache (also a metasearch). Lists show one price per flight
+  and its source; the seller is only known after a live check, on the Planner's "See who sells it". Kiwi-only
+  self-transfer combinations and Israeli agencies such as Gulliver are not covered unless Google lists them.
+- **"Checked" on a results line** means Google's price as of the search, which the Worker keeps for up to 12
+  hours; it is not re-checked until the line is opened.
 - **OpenFlights city names** are under the Open Database License (attribution, shown in Settings → About;
   share-alike for the derived data file). Fine for a personal app; if the app is ever published commercially,
   review it or swap in another source. Reverting is one line in `scripts/build-map-data.mjs`.
@@ -262,6 +274,8 @@ None recorded yet (nothing has run on a phone).
 
 ## Changelog
 
+- **2026-11-12** — Fourth round: source badge on every price, "Price sources" explainer, "See who sells it" on
+  the Planner (Worker `/booking`). 136 tests. Published as an update; the Worker redeploys with it.
 - **2026-11-12** — Third round: airport card before selecting, more names when zoomed in, a separate report
   button on every screen. Owner reported the previous rounds "seem to work". 130 tests. Published as an update.
 - **2026-11-12** — Second round of owner's requests: city names on the map (with served-city names from

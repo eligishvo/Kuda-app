@@ -1,7 +1,7 @@
 // Turns the raw answers of SerpApi and Travelpayouts into the app's own types (shared/types.ts).
 // Pure functions with no network calls, so they're tested against small saved answers in tests/fixtures.
 import { isDate, nightsBetween } from './dates';
-import { Destination, Itinerary, Layover, Leg, OneWay } from './types';
+import { Destination, Itinerary, Layover, Leg, OneWay, Seller } from './types';
 
 const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
 const text = (v: unknown): string => (typeof v === 'string' ? v : '');
@@ -191,4 +191,33 @@ export function normalizeFlights(raw: unknown): Itinerary[] {
     });
   }
   return out;
+}
+
+/**
+ * SerpApi Google Flights booking options → who sells the chosen trip and for how much, cheapest first.
+ * Each option is either one ticket ("together") or two separate tickets ("departing" + "returning").
+ */
+export function normalizeSellers(raw: unknown): Seller[] {
+  const list = (raw as Raw)?.booking_options;
+  if (!Array.isArray(list)) return [];
+  const out: Seller[] = [];
+  for (const o of list as Raw[]) {
+    if (o?.together && text(o.together.book_with)) {
+      const t = o.together;
+      out.push({ name: text(t.book_with), airline: t.airline === true, price: num(t.price), fare: text(t.option_title) || undefined, separate: false });
+    } else if (o?.departing && o?.returning && text(o.departing.book_with) && text(o.returning.book_with)) {
+      const a = o.departing;
+      const b = o.returning;
+      const pa = num(a.price);
+      const pb = num(b.price);
+      out.push({
+        name: text(a.book_with) === text(b.book_with) ? text(a.book_with) : `${text(a.book_with)} + ${text(b.book_with)}`,
+        airline: a.airline === true && b.airline === true,
+        price: pa != null && pb != null ? pa + pb : null,
+        separate: true,
+      });
+    }
+  }
+  // Priced sellers first, cheapest first; the ones without a price last
+  return out.sort((x, y) => (x.price ?? Infinity) - (y.price ?? Infinity) || x.name.localeCompare(y.name));
 }

@@ -3,7 +3,7 @@ import { hitPin } from '../src/map/hitTest';
 import { airportByCode, airportLabel } from '../src/map/mapData';
 import { labelLimit, Pin, PIN_H, PIN_LIFT, PIN_W, pinShows } from '../src/map/pins';
 import { makeView, project } from '../src/map/projection';
-import { buildMixed, buildOptions, buildResults, defaultFilters, filterOptions, planCalls, priceText, stopsText, totalCost } from '../src/results/results';
+import { buildMixed, buildOptions, buildResults, defaultFilters, filterOptions, originOf, planCalls, priceText, stopsText, totalCost } from '../src/results/results';
 import { defaultSearch, Search } from '../src/search/search';
 import { normalizeExplore, normalizeOneWays, normalizeTravelpayouts } from '../shared/normalize';
 import { Destination } from '../shared/types';
@@ -195,6 +195,17 @@ describe('flying home from a different airport', () => {
     const f = defaultFilters(search);
     expect(filterOptions(all, f).some((o) => o.back)).toBe(true);
     expect(filterOptions(all, { ...f, mixed: false }).some((o) => o.back)).toBe(false);
+  });
+});
+
+describe('where a price comes from', () => {
+  it('names the source and whether it was checked', () => {
+    expect(originOf('live')).toMatchObject({ source: 'Google Flights', status: 'Checked' });
+    expect(originOf('estimate')).toMatchObject({ source: 'Aviasales', status: 'Estimate' });
+    expect(originOf('rough')).toMatchObject({ source: 'Aviasales', status: 'Rough estimate' });
+    expect(originOf('none').status).toBe('No price');
+    expect(originOf('estimate', true).detail).toMatch(/one-way/);
+    expect(originOf('estimate').detail).toMatch(/Not checked live/);
   });
 });
 

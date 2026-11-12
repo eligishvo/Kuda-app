@@ -1,6 +1,6 @@
 // Talks to the Kuda Worker. The Worker's address and the app token are typed in once on the debug screen and
 // kept on the phone (the token is never committed to the repo). Kept free of React so it can be tested.
-import { ApiResult, Destination, Itinerary, OneWay, Usage } from '../../shared/types';
+import { ApiResult, Destination, Itinerary, OneWay, Seller, Usage } from '../../shared/types';
 
 export type Connection = { url: string; token: string };
 
@@ -38,6 +38,8 @@ export const api = {
     get<OneWay[]>(c, `/oneways${query(p)}`, f),
   flights: (c: Connection, p: FlightQuery, f?: typeof fetch) =>
     get<Itinerary[]>(c, `/flights${query({ ...p, back: p.back && p.back !== p.dest ? p.back : undefined })}`, f),
+  sellers: (c: Connection, p: FlightQuery & { bookingToken: string }, f?: typeof fetch) =>
+    get<Seller[]>(c, `/booking${query({ origin: p.origin, dest: p.dest, out: p.out, ret: p.ret, adults: p.adults, back: p.back && p.back !== p.dest ? p.back : undefined, booking_token: p.bookingToken })}`, f),
   returns: (c: Connection, p: FlightQuery & { departureToken: string }, f?: typeof fetch) =>
     get<Itinerary[]>(c, `/returns${query({ origin: p.origin, dest: p.dest, out: p.out, ret: p.ret, adults: p.adults, back: p.back && p.back !== p.dest ? p.back : undefined, departure_token: p.departureToken })}`, f),
 };

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { addDays, durationBucket, fitsWindow, isDate, monthsInWindow, nightsBetween } from '../shared/dates';
-import { normalizeExplore, normalizeFlights, normalizeTravelpayouts } from '../shared/normalize';
+import { normalizeExplore, normalizeFlights, normalizeSellers, normalizeTravelpayouts } from '../shared/normalize';
+import booking from './fixtures/booking.json';
 import explore from './fixtures/explore.json';
 import flights from './fixtures/flights.json';
 import travelpayouts from './fixtures/travelpayouts.json';
@@ -143,5 +144,30 @@ describe('SerpApi Google Flights', () => {
 
   it('copes with an empty answer', () => {
     expect(normalizeFlights({})).toEqual([]);
+  });
+});
+
+describe('who sells a trip', () => {
+  const sellers = normalizeSellers(booking);
+
+  it('lists airlines and agencies, cheapest first, unpriced last', () => {
+    expect(sellers.map((x) => `${x.name} ${x.price}`)).toEqual(['Wizz Air + Ryanair 115', 'Kiwi.com 131', 'Gotogate 138', 'Aegean 142', 'Call to book null']);
+  });
+
+  it('says who is the airline and who is a third party', () => {
+    expect(sellers.find((x) => x.name === 'Aegean')).toEqual({ name: 'Aegean', airline: true, price: 142, fare: 'Economy Light', separate: false });
+    expect(sellers.find((x) => x.name === 'Kiwi.com')).toMatchObject({ airline: false, separate: false });
+    expect(sellers.find((x) => x.name === 'Gotogate')).toMatchObject({ airline: false });
+  });
+
+  it('adds up two separate tickets', () => {
+    expect(sellers[0]).toEqual({ name: 'Wizz Air + Ryanair', airline: true, price: 115, fare: undefined, separate: true });
+  });
+
+  it('never passes on booking links or form data, and copes with an empty answer', () => {
+    expect(JSON.stringify(sellers)).not.toContain('secret');
+    expect(JSON.stringify(sellers)).not.toContain('google.com');
+    expect(normalizeSellers({})).toEqual([]);
+    expect(normalizeSellers(null)).toEqual([]);
   });
 });

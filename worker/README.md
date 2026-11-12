@@ -10,6 +10,7 @@ caches answers in Cloudflare KV, and stops after a set number of SerpApi searche
 | `/oneways?origin&month&dir` (`dir` = `out` or `back`) | One-way fares from the airport to everywhere, or from everywhere to it (`OneWay[]`) | Travelpayouts | 12 h |
 | `/flights?origin&dest&out&ret&adults&back?` | Outbound options with `departureToken` (`Itinerary[]`). `back` = airport to fly home from, when different from `dest` | SerpApi Google Flights | 1 h |
 | `/returns?…&departure_token` | Return options for one outbound flight (`Itinerary[]`) | SerpApi Google Flights | 1 h |
+| `/booking?…&booking_token` | Who sells a chosen trip, airline or agency, with prices (`Seller[]`) | SerpApi Google Flights | 1 h |
 | `/usage` | Today's SerpApi searches and the cap | KV | — |
 
 Every request needs the header `X-App-Token: <APP_TOKEN>`. Every answer looks like

@@ -89,6 +89,20 @@ export type Itinerary = {
   bookingToken?: string;
 };
 
+/** Someone who sells a chosen trip: the airline itself or a travel agency (a "third party"). */
+export type Seller = {
+  /** e.g. "Aegean", "Kiwi.com"; two names joined with " + " when the flights are sold as separate tickets. */
+  name: string;
+  /** True when the airline sells it directly, false for a travel agency. */
+  airline: boolean;
+  /** The seller's price in US dollars for the whole trip, when Google shows one. */
+  price: number | null;
+  /** The fare's name, e.g. "Economy Light", when given. */
+  fare?: string;
+  /** The way out and the way back are bought as two separate tickets. */
+  separate: boolean;
+};
+
 /** What the user picked: handed to the trip planner. */
 export type TripSelection = {
   origin: string;

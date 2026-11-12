@@ -5,7 +5,7 @@
 // It is written against small interfaces (a key-value store and a fetch function) so the tests can run it
 // in Node with fakes; worker/src/index.ts plugs in the real Cloudflare ones.
 import { isDate } from '../../shared/dates';
-import { normalizeExplore, normalizeFlights, normalizeOneWays, normalizeTravelpayouts } from '../../shared/normalize';
+import { normalizeExplore, normalizeFlights, normalizeOneWays, normalizeSellers, normalizeTravelpayouts } from '../../shared/normalize';
 import { ApiResult, Usage } from '../../shared/types';
 
 /** The part of Cloudflare KV that the Worker uses. */
@@ -182,7 +182,7 @@ export async function handle(request: Request, env: Env, deps: Deps = REAL): Pro
       });
     }
 
-    if (url.pathname === '/flights' || url.pathname === '/returns') {
+    if (url.pathname === '/flights' || url.pathname === '/returns' || url.pathname === '/booking') {
       const dest = q.get('dest');
       const out = q.get('out');
       const ret = q.get('ret');
@@ -210,6 +210,15 @@ export async function handle(request: Request, env: Env, deps: Deps = REAL): Pro
       if (url.pathname === '/flights') {
         return await cached(env, deps, `flights:${base}`, TTL.flights, async () => {
           const data = normalizeFlights(await serpapi(env, deps, params));
+          return { data, empty: data.length === 0 };
+        });
+      }
+      if (url.pathname === '/booking') {
+        // Who sells a chosen trip: the same search plus the trip's booking token
+        const booking = q.get('booking_token');
+        if (!booking || booking.length > 6000) throw new Problem('booking_token (from /returns) is required.', 400);
+        return await cached(env, deps, `booking:${base}:${await digest(booking)}`, TTL.flights, async () => {
+          const data = normalizeSellers(await serpapi(env, deps, { ...params, booking_token: booking }));
           return { data, empty: data.length === 0 };
         });
       }

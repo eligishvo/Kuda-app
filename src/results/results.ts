@@ -307,3 +307,38 @@ export function filterOptions(options: Option[], f: Filters): Option[] {
 
 /** The whole party's cost: prices are per person. */
 export const totalCost = (o: Option, adults: number) => o.estimate.price * adults;
+
+/** Where a price comes from and how far to trust it, in words for the screens. */
+export type Origin = {
+  /** The service the price was read from. */
+  source: 'Google Flights' | 'Aviasales';
+  /** Short tag, e.g. "Checked", "Estimate". */
+  status: 'Checked' | 'Estimate' | 'Rough estimate' | 'No price';
+  /** One sentence saying what that means. */
+  detail: string;
+};
+
+export function originOf(kind: ResultKind, mixed = false): Origin {
+  if (kind === 'live') {
+    return { source: 'Google Flights', status: 'Checked', detail: 'Google’s price when the search ran (kept for up to 12 hours). The seller is the airline or an agency Google lists; the live check names them.' };
+  }
+  if (kind === 'estimate') {
+    return {
+      source: 'Aviasales',
+      status: 'Estimate',
+      detail: mixed
+        ? 'Two nonstop one-way fares other people found on Aviasales in the last week, added together and raised 10%. Not checked live.'
+        : 'A nonstop fare other people found on Aviasales in the last week, raised 10%. Not checked live.',
+    };
+  }
+  if (kind === 'rough') {
+    return {
+      source: 'Aviasales',
+      status: 'Rough estimate',
+      detail: mixed
+        ? 'One-way fares from Aviasales’ cache, at least one with a connection. Often 16–28% off. Not checked live.'
+        : 'A connecting fare from Aviasales’ cache. Often 16–28% off. Not checked live.',
+    };
+  }
+  return { source: 'Google Flights', status: 'No price', detail: 'Neither source has a price for these dates. The live check asks Google directly.' };
+}

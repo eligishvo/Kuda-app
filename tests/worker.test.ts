@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Env, handle, Store } from '../worker/src/handler';
+import bookingRaw from './fixtures/booking.json';
 import explore from './fixtures/explore.json';
 import flights from './fixtures/flights.json';
 import onewaysBack from './fixtures/oneways-back.json';
@@ -30,6 +31,7 @@ function fakeFetch(overrides: Record<string, unknown> = {}) {
     if (url.hostname === 'api.travelpayouts.com' && url.searchParams.get('one_way') === 'true') body = url.searchParams.get('origin') ? onewaysOut : onewaysBack;
     else if (url.hostname === 'api.travelpayouts.com') body = overrides.travelpayouts ?? travelpayouts;
     else if (url.searchParams.get('engine') === 'google_travel_explore') body = overrides.explore ?? explore;
+    else if (url.searchParams.get('booking_token')) body = bookingRaw;
     else body = overrides.flights ?? flights;
     return { ok: true, status: 200, json: async () => body };
   }) as unknown as typeof fetch;
@@ -184,6 +186,18 @@ describe('Worker: endpoints', () => {
     await call('/flights?origin=TLV&dest=ATH&out=2026-12-07&ret=2026-12-14&back=ATH');
     expect(net.calls[2].searchParams.get('type')).toBe('1');
     expect((await call('/flights?origin=TLV&dest=ATH&out=2026-12-07&ret=2026-12-14&back=Salonika')).status).toBe(400);
+  });
+
+  it('/booking lists who sells a chosen trip (one search, kept an hour)', async () => {
+    const { call, net } = setup();
+    const path = '/booking?origin=TLV&dest=ATH&out=2026-12-07&ret=2026-12-14&booking_token=BOOK-1';
+    const r = await call(path);
+    expect(r.body).toMatchObject({ ok: true, cached: false, usage: { used: 1 } });
+    expect(r.body.data.map((x: any) => x.name)).toEqual(['Wizz Air + Ryanair', 'Kiwi.com', 'Gotogate', 'Aegean', 'Call to book']);
+    expect(Object.fromEntries(net.calls[0].searchParams)).toMatchObject({ engine: 'google_flights', type: '1', departure_id: 'TLV', arrival_id: 'ATH', booking_token: 'BOOK-1' });
+    expect((await call(path)).body.cached).toBe(true);
+    expect(net.calls).toHaveLength(1);
+    expect((await call('/booking?origin=TLV&dest=ATH&out=2026-12-07&ret=2026-12-14')).status).toBe(400);
   });
 
   it('never returns the API keys', async () => {
