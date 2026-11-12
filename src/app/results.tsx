@@ -78,7 +78,7 @@ export default function ResultsScreen() {
             );
           })}
           <Text style={[styles.small, { color: t.muted }]}>
-            Tapping a line checks it live on Google Flights. After you choose flights, the Planner can list who sells them
+            Tapping a line checks it live on Google Flights. After you choose flights, the trip's Flights tab can list who sells them
             (the airline or a travel agency) and each seller’s price.
           </Text>
         </View>

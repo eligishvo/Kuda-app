@@ -123,6 +123,13 @@ Added 2026-11-12, fourth round (owner asked where prices come from and who sells
   flights, each marked "Airline, direct" or "Third party (travel agency)", with its price. Worker `/booking`
   (SerpApi booking options via the return option's `booking_token`), `normalizeSellers`, `Seller` type.
 
+Added 2026-11-13: **trip planner, version 1** (brief: `docs/PLANNER.md`, decided with the owner):
+- Choosing a return flight now starts a **trip** and opens it (`src/app/trip.tsx`): tabs for Plan (day by day),
+  Stay (recorded by hand, with "nights without a stay"), Budget (flights + stays + activities + other costs,
+  total and per person), List (checklist and notes) and Flights (the old Planner content, with "See who sells it").
+- "My trips" (`src/app/planner.tsx`, reachable from the map and Settings) lists saved trips with Open / Delete.
+- Trips live on the phone under `kuda.trips`; flights chosen with an earlier version become the first trip.
+
 ## How to test on a phone
 
 1. In the repo folder: `git pull`, `npm install`, `npx expo start`.
@@ -146,6 +153,15 @@ After a search, tap a result row, then "Compare flights". Three date rows fill i
 searches). Tap a date row to see its outbound flights; tap one ("See returns", 1 search); tap a return
 ("Choose"): the Planner opens with both flights. Go back to the map, open Settings → Chosen flights: the same
 trip is there. For a "no estimate" airport the button says "Check flights".
+
+## How to test the trip planner
+
+1. Search, open a destination, choose an outbound and a return: a trip opens on the Plan tab.
+2. Plan: "+ Add to this day", type a time like 930 and a name, Save; tap the item to edit or delete it.
+3. Stay: add a place for part of the trip; the warning should count the nights still missing.
+4. Budget: check the total; correct the flights cost; add a per-person cost and a for-everyone cost.
+5. List: tick items, add one, write a note. Close and reopen the app: everything should still be there.
+6. Map → "My trips": the trip is listed with its total; choosing other flights adds a second trip.
 
 ## How to test the second round
 
@@ -180,16 +196,16 @@ rings on the map should follow. Close and reopen the app: the search should stil
 
 ## Next
 
-1. The owner tests phases 2b to 5 and the two additions on the phone (Expo Go or the new preview build); fix
-   what turns up.
-2. Check that the first GitHub run linked the Expo project (it commits `app.json` with the project id), built
-   the Android preview app and published the update. After it, `git pull` before working.
-3. Answer the per-person price question (below) and then show totals for more than one adult.
-4. Later ideas, only if the owner asks: robots for High Command's Bots tab; the real trip planner.
+1. The owner tries the trip planner on the phone; fix what turns up.
+2. Still open from earlier: the per-person price question (below); the seller list, mixed-airport options and
+   multi-city answers have only met made-up test answers.
+3. Planner ideas listed at the end of `docs/PLANNER.md`, only if the owner asks.
 
 ## Not verified
 
 - Phase 2b on a phone (calendar taps, the country list, the summary pill's size on a small screen).
+- The trip planner on a phone: the forms with the keyboard open (the screen should scroll so the field stays
+  visible), the calendar inside the Stay form, long trips with many day cards.
 - The second round on a phone: city names (legibility, how they feel while dragging), the search and results
   screens, and the mixed-airport options against real Travelpayouts one-way answers (`/oneways` was only run in
   tests; calling Travelpayouts with only a destination is documented but untried with the owner's token).
@@ -274,6 +290,8 @@ None recorded yet (nothing has run on a phone).
 
 ## Changelog
 
+- **2026-11-13** — Trip planner version 1: trips started from chosen flights, with Plan, Stay, Budget, List and
+  Flights tabs; "My trips". Rules in `src/planner/trip.ts` (14 tests; 150 in total). Published as an update.
 - **2026-11-12** — Fourth round: source badge on every price, "Price sources" explainer, "See who sells it" on
   the Planner (Worker `/booking`). 136 tests. Published as an update; the Worker redeploys with it.
 - **2026-11-12** — Third round: airport card before selecting, more names when zoomed in, a separate report

@@ -72,7 +72,8 @@ export function whereOf(route: string): string {
     '/search': 'Search flights',
     '/results': 'Results list',
     '/destination': 'Destination (live flights)',
-    '/planner': 'Planner',
+    '/planner': 'My trips',
+    '/trip': 'Trip planner',
     '/settings': 'Settings',
     '/debug': 'Flight data (debug)',
   };

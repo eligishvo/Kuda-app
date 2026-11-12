@@ -57,7 +57,7 @@ export default function Settings() {
         accessibilityRole="button"
         style={[styles.link, { backgroundColor: t.chip, borderColor: t.border }]}
       >
-        <Text style={[styles.linkText, { color: t.text }]}>Chosen flights (planner)</Text>
+        <Text style={[styles.linkText, { color: t.text }]}>My trips (planner)</Text>
         <Text style={[styles.linkText, { color: t.muted }]}>›</Text>
       </Pressable>
 

@@ -4,7 +4,8 @@ Expo / React Native / TypeScript app: pick destinations on a globe that flattens
 from TLV, compare itineraries, hand the chosen flights to a trip planner. Android first. Part of the High Command
 ecosystem (app id `kuda`, repo `eligishvo/Kuda-app`, Expo project `elidesigninc/kuda`).
 
-Read `docs/HANDOFF.md` first (what's built, what's next). `docs/BRIEF.md` is the spec: don't change it unless the
+Read `docs/HANDOFF.md` first (what's built, what's next). `docs/BRIEF.md` is the spec (`docs/PLANNER.md` for the
+trip planner): don't change it unless the
 owner changes a decision, and log any change in HANDOFF.md.
 
 ## Stack
@@ -34,7 +35,7 @@ the same code as the app: the quickest way to look at a map change without a pho
 
 | Path | What |
 |---|---|
-| `src/app/` | Screens (Expo Router): `index.tsx` map + selection sheet, `search.tsx` search form, `results.tsx` results list with filters, `destination.tsx` live flights, `planner.tsx` placeholder, `report.tsx` report form, `settings.tsx`, `debug.tsx`, `_layout.tsx` |
+| `src/app/` | Screens (Expo Router): `index.tsx` map + selection sheet, `search.tsx` search form, `results.tsx` results list with filters, `destination.tsx` live flights, `planner.tsx` list of trips, `trip.tsx` one trip (plan, stay, budget, list, flights), `report.tsx` report form, `settings.tsx`, `debug.tsx`, `_layout.tsx` |
 | `src/map/projection.ts` | The globe-to-flat projection maths (worklets; unit tested) |
 | `src/map/draw.ts` | Turns countries, graticule and airports into paths for one frame (worklets) |
 | `src/map/GlobeMap.tsx` | Skia canvas + drag / pinch / tap gestures |
@@ -45,6 +46,7 @@ the same code as the app: the quickest way to look at a map change without a pho
 | `src/map/pins.ts`, `PricePins.tsx`, `useMapView.ts` | Price labels on the map; the shared "where the map is looking" values |
 | `src/map/labels.ts`, `CityLabels.tsx` | City names on the map: which ones show at a zoom, without overlapping |
 | `src/flights/flights.ts` | Destination screen rules: which dates to check live, describing and comparing flights, the chosen trip |
+| `src/planner/` | Trip planner: the `Trip` rules (`trip.ts`), saved trips (`TripsContext.tsx`), the tabs. Brief: `docs/PLANNER.md` |
 | `src/search/` | The trip being searched: departure, dates, trip length, travelers, budget (rules + shared state) |
 | `src/ui/` | Shared pieces: selection sheet, results sheet, calendar, stepper |
 | `src/theme/` | The three themes as token objects, and the theme provider |

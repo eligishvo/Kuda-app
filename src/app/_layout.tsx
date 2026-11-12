@@ -9,6 +9,7 @@ import { StatusBar } from 'expo-status-bar';
 import { View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { TripsProvider } from '../planner/TripsContext';
 import { ReportButton } from '../report/ReportButton';
 import { ResultsProvider } from '../results/useResults';
 import { SearchProvider } from '../search/SearchContext';
@@ -34,7 +35,8 @@ function Screens() {
         <Stack.Screen name="search" options={{ title: 'Search flights' }} />
         <Stack.Screen name="results" options={{ title: 'Results' }} />
         <Stack.Screen name="destination" options={{ title: 'Flights' }} />
-        <Stack.Screen name="planner" options={{ title: 'Planner' }} />
+        <Stack.Screen name="planner" options={{ title: 'Trips' }} />
+        <Stack.Screen name="trip" options={{ title: 'Trip' }} />
         <Stack.Screen name="settings" options={{ title: 'Settings' }} />
         <Stack.Screen name="report" options={{ title: 'Report a problem', headerRight: undefined }} />
         <Stack.Screen name="debug" options={{ title: 'Flight data (debug)' }} />
@@ -55,7 +57,9 @@ export default function RootLayout() {
           <SearchProvider>
             <SelectionProvider>
               <ResultsProvider>
-                <Screens />
+                <TripsProvider>
+                  <Screens />
+                </TripsProvider>
               </ResultsProvider>
             </SelectionProvider>
           </SearchProvider>

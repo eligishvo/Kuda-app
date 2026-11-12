@@ -10,6 +10,7 @@ import { airportByCode, airportCodesIn, airportLabel, AIRPORTS, airportsIn, coun
 import { Pin } from '../map/pins';
 import { flyTo, useMapView } from '../map/useMapView';
 import { datePairs, encodePairs, suggestedPairs } from '../flights/flights';
+import { useTrips } from '../planner/TripsContext';
 import { ReportButton } from '../report/ReportButton';
 import { priceText, Result, windowOf } from '../results/results';
 import { useResults } from '../results/useResults';
@@ -30,6 +31,7 @@ export default function Home() {
   const view = useMapView();
   const [selection, update] = useSelection();
   const { search } = useSearch();
+  const { trips } = useTrips();
   const homeCc = search.departureCc;
   /** The country whose airports are listed in the sheet, if any. */
   const [narrowCc, setNarrowCc] = useState<string | null>(null);
@@ -80,7 +82,7 @@ export default function Home() {
     [search.departureAirports, selection, pins, previewCode],
   );
   // Roughly how much of the screen the top bar and the bottom panel cover
-  const covered = useMemo(() => ({ top: insets.top + 130, bottom: insets.bottom + (showResults ? 330 : 190) }), [insets.top, insets.bottom, showResults]);
+  const covered = useMemo(() => ({ top: insets.top + 180, bottom: insets.bottom + (showResults ? 330 : 190) }), [insets.top, insets.bottom, showResults]);
 
   const onHit = useCallback(
     (hit: Hit, flat: boolean) => {
@@ -167,6 +169,15 @@ export default function Home() {
               {travelersText(search.adults)} · up to <Text style={{ color: t.price }}>${search.budget}</Text> each
             </Text>
           </Pressable>
+          {/* The planner: trips started by choosing flights */}
+          <Pressable
+            onPress={() => router.push('/planner')}
+            accessibilityRole="button"
+            accessibilityLabel="My trips"
+            style={[styles.trips, { backgroundColor: t.panel, borderColor: t.border }]}
+          >
+            <Text style={[styles.tripMain, { color: t.text }]}>My trips{trips.length > 0 ? ` (${trips.length})` : ''}</Text>
+          </Pressable>
         </View>
         <Pressable
           onPress={() => router.push('/settings')}
@@ -251,6 +262,7 @@ const styles = StyleSheet.create({
   left: { flex: 1, alignItems: 'flex-start', paddingRight: 12 },
   brand: { fontFamily: FONTS.heading, fontSize: 28 },
   trip: { borderWidth: 1, borderRadius: 14, paddingHorizontal: 12, paddingVertical: 7, marginTop: 6, minHeight: TOUCH, justifyContent: 'center', maxWidth: '100%' },
+  trips: { borderWidth: 1, borderRadius: 22, paddingHorizontal: 14, height: TOUCH, marginTop: 6, justifyContent: 'center' },
   tripMain: { fontFamily: FONTS.bodyMedium, fontSize: 13 },
   tripSub: { fontFamily: FONTS.body, fontSize: 12, marginTop: 1 },
   settings: { width: TOUCH, height: TOUCH, borderRadius: TOUCH / 2, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },

@@ -12,12 +12,13 @@ import {
   nearest, routeText, stopsLine,
 } from '../flights/flights';
 import { Airport, airportByCode, airportCodesIn, airportLabel, AIRPORTS } from '../map/mapData';
+import { useTrips } from '../planner/TripsContext';
 import { selectedAirports } from '../selection/selection';
 import { useSelection } from '../selection/useSelection';
 import { windowOf } from '../results/results';
 import { shortDate, travelersText } from '../search/search';
 import { useSearch } from '../search/SearchContext';
-import { KEYS, load, save } from '../storage/store';
+import { KEYS, load } from '../storage/store';
 import { useTheme } from '../theme/ThemeContext';
 import { FONTS, Theme, TOUCH } from '../theme/themes';
 
@@ -33,6 +34,7 @@ const SHOWN = 5;
 export default function DestinationScreen() {
   const t = useTheme();
   const { search } = useSearch();
+  const trips = useTrips();
   const params = useLocalSearchParams<{ code?: string; pairs?: string; back?: string }>();
   const code = (params.code ?? '').toUpperCase();
   const airport = airportByCode(code);
@@ -132,8 +134,9 @@ export default function DestinationScreen() {
   const choose = async (p: DatePair, inbound: Itinerary) => {
     const out = picked[keyOf(back, p)];
     if (!out) return;
-    await save(KEYS.trip, buildTrip(origin, code, back, search.adults, out, inbound));
-    router.push('/planner');
+    // Choosing flights starts a trip in the planner and opens it
+    const trip = trips.add(buildTrip(origin, code, back, search.adults, out, inbound));
+    router.push({ pathname: '/trip', params: { id: trip.id } });
   };
 
   const title = airport ? `${airport.city || airport.name} (${code})` : code;
@@ -227,7 +230,7 @@ export default function DestinationScreen() {
       </Text>
       <Text style={[styles.small, { color: t.muted }]}>
         Each price is the lowest Google lists for that flight, from the airline or a travel agency. After you choose
-        flights, the Planner can show who sells them.
+        flights, the trip's Flights tab can show who sells them.
       </Text>
       <Text style={[styles.small, { color: t.muted }]}>
         Prices are for the whole trip there and back, as Google shows them for {travelersText(search.adults)}.
