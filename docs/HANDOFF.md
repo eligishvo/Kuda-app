@@ -204,6 +204,10 @@ None recorded yet (nothing has run on a phone).
 
 ## Changelog
 
+- **2026-11-12** — The first Android build failed in Gradle: the compiler was killed (out of memory on Expo's
+  free build machine) while compiling Skia for the x86 emulator format. The preview build now compiles only
+  for arm64 phones (`gradleCommand` in `eas.json`), which is every current Android phone but not emulators or
+  very old 32-bit phones. Added the "Build status" workflow, which prints why the newest build failed.
 - **2026-11-12** — First GitHub run: Expo project linked, Android preview build started, Worker redeployed; the
   update step failed because it bundled every platform and the app has no web packages. Publishing is now
   Android only (`eas update --platform android`).
