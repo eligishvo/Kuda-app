@@ -1,0 +1,14 @@
+{
+  "success": true,
+  "currency": "usd",
+  "data": [
+    { "origin": "TLV", "destination": "BUD", "origin_airport": "TLV", "destination_airport": "BUD", "price": 100, "airline": "W6", "flight_number": "2326", "departure_at": "2026-12-08T05:15:00+02:00", "return_at": "2026-12-14T21:30:00+01:00", "transfers": 0, "return_transfers": 0, "duration": 410 },
+    { "origin": "TLV", "destination": "BUD", "origin_airport": "TLV", "destination_airport": "BUD", "price": 90, "airline": "LO", "flight_number": "152", "departure_at": "2026-12-09T05:15:00+02:00", "return_at": "2026-12-15T21:30:00+01:00", "transfers": 1, "return_transfers": 1, "duration": 900 },
+    { "origin": "TLV", "destination": "LCA", "origin_airport": "TLV", "destination_airport": "LCA", "price": 61, "airline": "W6", "flight_number": "4502", "departure_at": "2026-12-03T10:00:00+02:00", "return_at": "2026-12-06T12:00:00+02:00", "transfers": 0, "return_transfers": 0, "duration": 130 },
+    { "origin": "TLV", "destination": "LCA", "origin_airport": "TLV", "destination_airport": "LCA", "price": 55, "airline": "W6", "flight_number": "4502", "departure_at": "2026-12-17T10:00:00+02:00", "return_at": "2026-12-20T12:00:00+02:00", "transfers": 0, "return_transfers": 0, "duration": 130 },
+    { "origin": "TLV", "destination": "LIS", "origin_airport": "TLV", "destination_airport": "LIS", "price": 310, "airline": "TK", "flight_number": "785", "departure_at": "2026-12-11T08:00:00+02:00", "return_at": "2026-12-20T15:00:00+00:00", "transfers": 1, "return_transfers": 1, "duration": 1100 },
+    { "origin": "TLV", "destination": "AER", "origin_airport": "TLV", "destination_airport": "AER", "price": 180, "airline": "A4", "flight_number": "702", "departure_at": "2026-12-05T08:00:00+02:00", "return_at": "2026-12-12T15:00:00+03:00", "transfers": 0, "return_transfers": 0, "duration": 400 },
+    { "origin": "TLV", "destination": "MOW", "origin_airport": "TLV", "destination_airport": "VKO", "price": 240, "airline": "DP", "flight_number": "810", "departure_at": "2026-12-05T08:00:00+02:00", "return_at": "2026-12-12T15:00:00+03:00", "transfers": 0, "return_transfers": 0, "duration": 500 },
+    { "origin": "TLV", "destination": "XXX", "price": 0, "departure_at": "bad", "return_at": "" }
+  ]
+}

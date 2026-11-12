@@ -1,0 +1,41 @@
+{
+  "search_parameters": { "engine": "google_travel_explore", "departure_id": "TLV", "month": "12", "travel_duration": "2", "currency": "USD" },
+  "destinations": [
+    {
+      "destination_id": "/m/0n2z", "name": "Athens", "country": "Greece",
+      "gps_coordinates": { "latitude": 37.9838, "longitude": 23.7275 },
+      "destination_airport": { "code": "ATH" },
+      "start_date": "2026-12-07", "end_date": "2026-12-14",
+      "flight_price": 142, "flight_duration": 135, "number_of_stops": 0, "airline": "Aegean", "airline_code": "A3"
+    },
+    {
+      "destination_id": "/m/04jpl", "name": "London", "country": "United Kingdom",
+      "gps_coordinates": { "latitude": 51.5072, "longitude": -0.1276 },
+      "destination_airport": { "code": "LGW" },
+      "start_date": "2026-12-02", "end_date": "2026-12-09",
+      "flight_price": 268.4, "number_of_stops": 0, "airline": "easyJet", "airline_code": "U2"
+    },
+    {
+      "destination_id": "/m/06c62", "name": "Rome", "country": "Italy",
+      "gps_coordinates": { "latitude": 41.9028, "longitude": 12.4964 },
+      "destination_airport": { "code": "FCO" },
+      "start_date": "2026-12-10", "end_date": "2026-12-16",
+      "flight_price": 97, "number_of_stops": 1, "airline": "Wizz Air", "airline_code": "W6"
+    },
+    {
+      "destination_id": "/m/0cnrr", "name": "Dead Sea", "country": "Israel",
+      "gps_coordinates": { "latitude": 31.5, "longitude": 35.5 },
+      "car_duration": 95
+    },
+    {
+      "destination_id": "/m/0156q", "name": "Berlin", "country": "Germany",
+      "destination_airport": { "code": "BER" },
+      "start_date": "2026-12-05", "end_date": "2026-12-12"
+    },
+    {
+      "destination_id": "/m/0n2z-dup", "name": "Athens again", "country": "Greece",
+      "destination_airport": { "code": "ATH" },
+      "start_date": "2026-12-08", "end_date": "2026-12-15", "flight_price": 150
+    }
+  ]
+}

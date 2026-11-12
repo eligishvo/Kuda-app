@@ -5,10 +5,11 @@ Spec: `docs/BRIEF.md`. Rules: `AGENTS.md`.
 
 ## Status (2026-11-12)
 
-**Phase 1 is written and passes every check that runs without a phone. It has not been run on a phone yet.**
-The first job of the next session is to try it in Expo Go and fix what the phone shows.
+**Phases 1 and 2 are written and pass every check that runs without a phone or API keys. Neither has been run
+for real yet:** the app has not been opened in Expo Go, and the Worker has not been deployed or called with real
+keys. The first job of the next session is to fix what those two tests turn up.
 
-Built:
+Built in phase 1:
 - Expo SDK 58 project (`kuda`, owner `elidesigninc`), Expo Router, TypeScript, vitest, same versions as Mechanoplanner.
 - Three themes (Monochrome default, Ocean, Dusk) as token objects in `src/theme/themes.ts`; the choice is saved.
 - Settings screen: theme picker, "Report a problem" (posts to the High Command relay as `app:kuda`), version.
@@ -21,6 +22,18 @@ Built:
 - High Command: Kuda added to `APPS` in High-Command `src/config.ts` and `relay/wrangler.toml`.
 - GitHub Action `.github/workflows/eas.yml` (checks, EAS update, `[build]` for an Android preview build).
 
+Built in phase 2:
+- `shared/`: the types (`Destination`, `PriceEstimate`, `Itinerary`, `Leg`, `TripSelection`, `Usage`, `ApiResult`),
+  the date-window filter (`fitsWindow`, `monthsInWindow`, `durationBucket`) and the normalizers for SerpApi Explore,
+  SerpApi Google Flights and Travelpayouts.
+- `worker/`: Cloudflare Worker with `/explore`, `/estimates`, `/flights`, `/returns`, `/usage`; KV cache (12 h for
+  Explore and estimates, 1 h for flights); daily SerpApi cap (`DAILY_SEARCH_CAP`, default 40); `X-App-Token` check.
+  Deploy steps are in `worker/README.md`; `.github/workflows/worker.yml` deploys it from repo secrets.
+- App: `src/api/client.ts` and a debug screen (Settings → Flight data (debug)) that calls every endpoint for TLV
+  and prints the normalized result, timing, cached or fresh, and the searches left today.
+- Tests: 68 in total, including the normalizers and date filter against fixtures and the whole Worker run in Node
+  with a fake store and a fake internet.
+
 ## How to test on a phone
 
 1. In the repo folder: `git pull`, `npm install`, `npx expo start`.
@@ -30,10 +43,18 @@ Built:
    chip; Clear; close and reopen the app (selection and theme should still be there); Settings → switch themes →
    send a test report (a ticket should appear in High Command under Kuda).
 
+## How to test the Worker
+
+1. Deploy it: `worker/README.md` (five repo secrets, then run the "Deploy worker" Action).
+2. In the app: Settings → Flight data (debug). Paste the Worker's address and the `APP_TOKEN`, Save.
+3. Tap Usage (free), then Estimates (free), then Explore, Flights, Returns (one search each; a second tap on the
+   same button should say "from cache (free)"). "Explore Greece" checks the country search.
+4. Tap "Flights ×2 adults" and compare its prices with "Flights": that answers the open question below.
+
 ## Next
 
-1. Fix whatever the phone test turns up (see "Not verified" below), then publish phase 1.
-2. Phase 2: Cloudflare Worker (`worker/`), shared types (`shared/`), debug screen. See the brief.
+1. Fix whatever the phone test and the first real Worker calls turn up (see "Not verified"), then publish.
+2. Phase 2b: search setup (departure picker, dates, trip length, travelers, budget). See the brief.
 
 ## Not verified (needs a phone)
 
@@ -44,6 +65,16 @@ Built:
   medium airports only above a higher zoom.
 - The first frame copies the border data to the UI thread once; a short pause when the app opens would be that.
 - The settings button is a "⚙" text character; if the phone's font draws it oddly, swap it for an icon.
+- The Worker has only been run in tests with made-up answers. The fixtures in `tests/fixtures/` were written by
+  hand from the SerpApi and Travelpayouts documentation and the fields listed in the brief, not captured from real
+  calls. If a real answer has a different shape, the debug screen will show an empty list or an error: save the
+  real answer as the fixture and adjust `shared/normalize.ts`.
+- The wording SerpApi uses for "no results" is matched loosely (`no results`, `empty results`, `hasn't returned
+  any results`); anything else is reported as an error.
+- `.github/workflows/worker.yml` relies on wrangler creating the KV namespace on the first deploy. If that step
+  fails, `worker/README.md` has the manual fallback.
+- The Worker's address in `app.json` (`https://kuda-worker.eligishvo.workers.dev`) is a guess based on the relay's
+  address; the debug screen lets you type the real one.
 
 ## Decisions and open questions
 
@@ -54,6 +85,18 @@ Built:
   the UI thread during gestures, and the centre stays still by itself. Stereographic is conformal too (shapes stay
   true), and at regional zoom it looks the same as a conic map. d3-geo is still used for tap hit-testing. If the
   owner wants conic conformal specifically, it replaces `radial()` and the two projection formulas.
+- **Is Google's price per person or for everyone (adults > 1)?** Still open; needs real keys. The debug screen's
+  "Flights ×2 adults" button answers it. Until then the app asks Explore and estimates with 1 adult, so those
+  prices are per person.
+- **App token:** typed into the debug screen and kept on the phone, not stored in `app.json`, so it never reaches
+  the repo or the update bundle. When there is a real search screen this may want a build-time setting instead.
+- **Russian routes** are hidden from Travelpayouts results by a list of Russian airport codes plus the A4 airline
+  (`HIDDEN_AIRPORTS`, `HIDDEN_AIRLINES` in `shared/normalize.ts`). Extend the list if others show up.
+- **Travelpayouts picks one fare per airport:** nonstop before connecting, then the cheapest. Filtering by the
+  user's window happens in the app (phase 3), so a fare outside the window can hide one inside it; if that shows
+  up in practice, move the window into the `/estimates` call.
+- **The cap counts searches sent**, including ones SerpApi answers with an error. It is kept in KV, which is not
+  exact under simultaneous calls; with one user that is fine.
 - **Brief corrected:** repo name `eligishvo/Kuda` → `eligishvo/Kuda-app` (the real repo). No decision changed.
 - **Robots:** Kuda has no test robots yet, so nothing was added to High Command's Bots tab. Add a `robots.yml`
   workflow and bot issues when there is something worth checking nightly (after phase 2).
@@ -63,7 +106,8 @@ Built:
   files: their airports can be picked as dots, but there is no country to tap.
 - **Expo link:** `app.json` has no EAS project id yet. The Action links it on its first run (needs the
   `EXPO_TOKEN` repo secret from an account that can publish to `elidesigninc/kuda`), or run `eas init` locally.
-- The first commit carries `[skip ci]` so no Expo update is spent before the phone test.
+- Both phase commits carry `[skip ci]` so no Expo update is spent before the phone test. Run "Deploy worker"
+  by hand from the Actions tab.
 
 ## Known issues
 
@@ -71,5 +115,8 @@ None recorded yet (nothing has run on a phone).
 
 ## Changelog
 
+- **2026-11-12** — Phase 2 written in the same cloud session: shared types and normalizers, the Worker, the API
+  client and debug screen, fixtures and tests (68 passing), deploy workflow and instructions. Checks: typecheck,
+  tests, Android bundle, wrangler dry-run build. Not deployed, not called with real keys.
 - **2026-11-12** — Phase 1 written in a Claude cloud session: project, themes, settings, globe map, selection,
   handoff files, High Command wiring. Checks: typecheck, 34 tests, Android bundle. Not yet run on a phone.

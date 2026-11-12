@@ -1,0 +1,14 @@
+name = "kuda-worker"
+main = "src/index.ts"
+compatibility_date = "2025-09-01"
+workers_dev = true
+
+[vars]
+# Most SerpApi searches per day (the free plan has 250 a month). Change it and redeploy.
+DAILY_SEARCH_CAP = "40"
+
+# The cache and the daily counter. With no id here, wrangler creates the KV namespace on the first deploy.
+[[kv_namespaces]]
+binding = "CACHE"
+
+# Secrets (never in this file): SERPAPI_KEY, TRAVELPAYOUTS_TOKEN, APP_TOKEN. See worker/README.md.

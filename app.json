@@ -22,13 +22,19 @@
       "predictiveBackGestureEnabled": false,
       "package": "com.eligishvo.kuda"
     },
-    "plugins": ["expo-router", "expo-font"],
+    "plugins": [
+      "expo-router",
+      "expo-font"
+    ],
     "runtimeVersion": {
       "policy": "appVersion"
     },
     "extra": {
       "highCommand": {
         "reportUrl": "https://high-command-relay.eligishvo.workers.dev"
+      },
+      "kuda": {
+        "workerUrl": "https://kuda-worker.eligishvo.workers.dev"
       }
     }
   }

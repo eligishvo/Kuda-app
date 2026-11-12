@@ -22,7 +22,7 @@ owner changes a decision, and log any change in HANDOFF.md.
 npm install
 npx expo start        # scan the QR code with Expo Go (phone and computer on the same Wi-Fi)
 npm run typecheck
-npm test              # vitest: projection maths, drawing, tap hit-testing, selection, report, themes
+npm test              # vitest: map maths, drawing, taps, selection, normalizers, date filter, the Worker
 npm run verify        # the two above plus the Android bundle (slow)
 npm run data          # rebuild the bundled map files (only to refresh borders or airports)
 ```
@@ -45,7 +45,11 @@ the same code as the app: the quickest way to look at a map change without a pho
 | `src/report/` | "Report a problem" → High Command relay |
 | `src/storage/` | AsyncStorage wrapper |
 | `tests/` | vitest |
-| `worker/`, `shared/` | Not there yet: Cloudflare Worker and shared types arrive in phase 2 |
+| `src/api/client.ts` | Calls the Worker (address and app token are typed in on the debug screen, kept on the phone) |
+| `src/app/debug.tsx` | Debug screen: calls each Worker endpoint for TLV and prints the result |
+| `shared/` | Types, date-window filter and normalizers used by both the app and the Worker |
+| `worker/` | Cloudflare Worker (flight data, KV cache, daily SerpApi cap). Read `worker/README.md` |
+| `tests/fixtures/` | Small saved API answers for the normalizer and Worker tests |
 
 ## Conventions
 
@@ -57,8 +61,9 @@ the same code as the app: the quickest way to look at a map change without a pho
 
 ## Don't touch
 
-- API keys never go in the app. From phase 2 they live as Cloudflare Worker secrets (`SERPAPI_KEY`,
-  `TRAVELPAYOUTS_TOKEN`, `APP_TOKEN`); never commit them or print them.
+- API keys never go in the app or the repo. They are Cloudflare Worker secrets (`SERPAPI_KEY`,
+  `TRAVELPAYOUTS_TOKEN`, `APP_TOKEN`), set from GitHub repo secrets by `.github/workflows/worker.yml`; never
+  commit them or print them. Tests use fakes: never call SerpApi from a test (searches are limited).
 - `src/map/data/*.json` by hand; `docs/BRIEF.md` without the owner's decision.
 
 ## Checks and shipping (owner's standing instruction, same as his other apps)
@@ -66,7 +71,7 @@ the same code as the app: the quickest way to look at a map change without a pho
 1. Run `npm run typecheck` and `npm test`. Run `npm run verify` if you changed packages or `app.json`.
 2. Update `docs/HANDOFF.md` in the same commit.
 3. Commit, merge into `main` and push `main` without asking. The GitHub Action (`.github/workflows/eas.yml`) runs
-   the checks and publishes an EAS update. Expo updates are limited: batch changes and push to `main` at the end
+   the checks and publishes an EAS update; `worker.yml` deploys the Worker when `worker/` or `shared/` changes. Expo updates are limited: batch changes and push to `main` at the end
    of a phase; use `[skip ci]` for commits that shouldn't publish. Add `[build]` to the commit message when a new
    installable Android app is needed.
 4. Don't watch the GitHub run unless the owner asks or a push is refused.

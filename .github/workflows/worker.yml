@@ -1,0 +1,70 @@
+# Deploys the Kuda Worker (worker/) to Cloudflare when it or the shared types change on main, or when run manually.
+# Needs these repo secrets (Settings → Secrets and variables → Actions):
+#   CLOUDFLARE_API_TOKEN   Cloudflare token with the "Edit Cloudflare Workers" template
+#   CLOUDFLARE_ACCOUNT_ID  shown on the Cloudflare dashboard's Workers page
+#   SERPAPI_KEY            from serpapi.com → Dashboard → API key
+#   TRAVELPAYOUTS_TOKEN    from travelpayouts.com → Profile → API token
+#   APP_TOKEN              any long random text; the same text goes into the app's Debug screen
+# The Cloudflare names used in High Command also work: CLOUDFLARE_APITOKEN, CLOUDFLARE_ID.
+# The three keys are copied into the Worker as secrets; they never appear in the repo or the app bundle.
+name: Deploy worker
+
+on:
+  push:
+    branches: [main]
+    paths: ['worker/**', 'shared/**', '.github/workflows/worker.yml']
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check secrets
+        id: secrets
+        env:
+          CF: ${{ secrets.CLOUDFLARE_API_TOKEN || secrets.CLOUDFLARE_APITOKEN }}
+          ACC: ${{ secrets.CLOUDFLARE_ACCOUNT_ID || secrets.CLOUDFLARE_ID }}
+          SERP: ${{ secrets.SERPAPI_KEY }}
+          TP: ${{ secrets.TRAVELPAYOUTS_TOKEN }}
+          APP: ${{ secrets.APP_TOKEN }}
+        run: |
+          missing=""
+          [ -z "$CF" ] && missing="$missing CLOUDFLARE_API_TOKEN"
+          [ -z "$ACC" ] && missing="$missing CLOUDFLARE_ACCOUNT_ID"
+          [ -z "$SERP" ] && missing="$missing SERPAPI_KEY"
+          [ -z "$TP" ] && missing="$missing TRAVELPAYOUTS_TOKEN"
+          [ -z "$APP" ] && missing="$missing APP_TOKEN"
+          if [ -n "$missing" ]; then
+            echo "::warning::Worker not deployed — add these secrets:$missing"
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.secrets.outputs.ready == 'true'
+
+      - name: Deploy
+        id: deploy
+        if: steps.secrets.outputs.ready == 'true'
+        uses: cloudflare/wrangler-action@v3
+        env:
+          SERPAPI_KEY: ${{ secrets.SERPAPI_KEY }}
+          TRAVELPAYOUTS_TOKEN: ${{ secrets.TRAVELPAYOUTS_TOKEN }}
+          APP_TOKEN: ${{ secrets.APP_TOKEN }}
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN || secrets.CLOUDFLARE_APITOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID || secrets.CLOUDFLARE_ID }}
+          workingDirectory: worker
+          secrets: |
+            SERPAPI_KEY
+            TRAVELPAYOUTS_TOKEN
+            APP_TOKEN
+
+      - name: Show the Worker address
+        if: steps.secrets.outputs.ready == 'true'
+        env:
+          URL: ${{ steps.deploy.outputs.deployment-url }}
+        run: |
+          echo "Worker address: $URL"
+          echo "### Worker deployed: $URL" >> "$GITHUB_STEP_SUMMARY"

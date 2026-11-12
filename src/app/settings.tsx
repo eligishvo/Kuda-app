@@ -1,5 +1,6 @@
 // Settings: pick a theme, report a problem (goes to High Command), and see which version is installed.
 import Constants from 'expo-constants';
+import { router } from 'expo-router';
 import * as Updates from 'expo-updates';
 import { useState } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -38,6 +39,16 @@ export default function Settings() {
 
       <Text style={[styles.heading, { color: t.text }]}>Report a problem</Text>
       <ReportForm theme={t} />
+
+      <Text style={[styles.heading, { color: t.text }]}>Developer</Text>
+      <Pressable
+        onPress={() => router.push('/debug')}
+        accessibilityRole="button"
+        style={[styles.link, { backgroundColor: t.chip, borderColor: t.border }]}
+      >
+        <Text style={[styles.linkText, { color: t.text }]}>Flight data (debug)</Text>
+        <Text style={[styles.linkText, { color: t.muted }]}>›</Text>
+      </Pressable>
 
       <Text style={[styles.heading, { color: t.text }]}>About</Text>
       <Text style={[styles.body, { color: t.muted }]}>
@@ -149,6 +160,8 @@ const styles = StyleSheet.create({
   swatchLand: { position: 'absolute', left: 8, top: 12, width: 30, height: 22, borderRadius: 8 },
   swatchSelected: { position: 'absolute', left: 26, top: 28, width: 18, height: 14, borderRadius: 5 },
   swatchDot: { position: 'absolute', left: 14, top: 38, width: 8, height: 8, borderRadius: 4 },
+  link: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, minHeight: TOUCH + 4 },
+  linkText: { fontFamily: FONTS.bodyMedium, fontSize: 15 },
   form: { gap: 10 },
   input: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, minHeight: TOUCH + 4, fontFamily: FONTS.body, fontSize: 15 },
   details: { minHeight: 110, paddingTop: 12, textAlignVertical: 'top' },

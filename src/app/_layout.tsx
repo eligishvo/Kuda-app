@@ -26,6 +26,7 @@ function Screens() {
       >
         <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="settings" options={{ title: 'Settings' }} />
+        <Stack.Screen name="debug" options={{ title: 'Flight data (debug)' }} />
       </Stack>
       <StatusBar style="light" />
     </View>
