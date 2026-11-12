@@ -38,3 +38,15 @@ export const countryName = (cc: string) => names.get(cc) ?? cc;
 export const airportsIn = (cc: string): Airport[] => byCountry.get(cc) ?? [];
 export const airportCodesIn = (cc: string): string[] => airportsIn(cc).map((a) => a.code);
 export const airportByCode = (code: string) => byCode.get(code);
+
+/** Countries you can fly from: those with at least one airport and a name, A to Z. */
+let withAirports: { cc: string; name: string; count: number }[] | null = null;
+export function countriesWithAirports() {
+  if (!withAirports) {
+    withAirports = [...byCountry.entries()]
+      .filter(([cc]) => names.has(cc))
+      .map(([cc, list]) => ({ cc, name: names.get(cc) as string, count: list.length }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }
+  return withAirports;
+}

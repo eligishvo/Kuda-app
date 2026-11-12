@@ -9,6 +9,7 @@ import { StatusBar } from 'expo-status-bar';
 import { View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { SearchProvider } from '../search/SearchContext';
 import { ThemeProvider, useTheme } from '../theme/ThemeContext';
 import { FONTS } from '../theme/themes';
 
@@ -25,6 +26,7 @@ function Screens() {
         }}
       >
         <Stack.Screen name="index" options={{ headerShown: false }} />
+        <Stack.Screen name="search" options={{ title: 'Trip details' }} />
         <Stack.Screen name="settings" options={{ title: 'Settings' }} />
         <Stack.Screen name="debug" options={{ title: 'Flight data (debug)' }} />
       </Stack>
@@ -41,7 +43,9 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <ThemeProvider>
-          <Screens />
+          <SearchProvider>
+            <Screens />
+          </SearchProvider>
         </ThemeProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>

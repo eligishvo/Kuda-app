@@ -5,9 +5,9 @@ Spec: `docs/BRIEF.md`. Rules: `AGENTS.md`.
 
 ## Status (2026-11-12)
 
-**Phases 1 and 2 are written and pass every check that runs without a phone or API keys. Neither has been run
-for real yet:** the app has not been opened in Expo Go, and the Worker has not been deployed or called with real
-keys. The first job of the next session is to fix what those two tests turn up.
+**Phases 1, 2 and 2b are built.** Phases 1 and 2 were run by the owner on his phone in Expo Go and against the
+deployed Worker with real keys on 2026-11-12: the globe, selection, themes, settings and every debug-screen call
+worked. Phase 2b (search setup) passes the checks but has not been tried on the phone yet.
 
 Built in phase 1:
 - Expo SDK 58 project (`kuda`, owner `elidesigninc`), Expo Router, TypeScript, vitest, same versions as Mechanoplanner.
@@ -34,6 +34,16 @@ Built in phase 2:
 - Tests: 68 in total, including the normalizers and date filter against fixtures and the whole Worker run in Node
   with a fake store and a fake internet.
 
+Built in phase 2b:
+- `src/search/`: the search (`departureCc`, `departureAirports`, `earliestOut`, `latestRet`, `minNights`,
+  `maxNights`, `adults`, `budget`) with one function, `sanitizeSearch`, that repairs any invalid combination; it
+  is saved on the phone and shared between screens through `SearchProvider` / `useSearch()`.
+- "Trip details" screen (`src/app/search.tsx`): departure country (searchable list) then its airports, a calendar
+  for the date window, trip-length and traveler steppers, budget per person in $25 steps.
+- The map screen shows the search as a tappable summary under the title. The departure country is the "home"
+  colour and can't be picked as a destination; every departure airport gets a ring.
+- The default budget is one constant: `DEFAULT_BUDGET` in `src/search/search.ts`.
+
 ## How to test on a phone
 
 1. In the repo folder: `git pull`, `npm install`, `npx expo start`.
@@ -51,30 +61,27 @@ Built in phase 2:
    same button should say "from cache (free)"). "Explore Greece" checks the country search.
 4. Tap "Flights ×2 adults" and compare its prices with "Flights": that answers the open question below.
 
+## How to test phase 2b
+
+On the map, tap the summary under "Kuda". Change the country (e.g. Greece) and pick two airports; pick a date
+range on the calendar; change nights, travelers and budget. Go back: the summary, the home country colour and the
+rings on the map should follow. Close and reopen the app: the search should still be there.
+
 ## Next
 
-1. Fix whatever the phone test and the first real Worker calls turn up (see "Not verified"), then publish.
-2. Phase 2b: search setup (departure picker, dates, trip length, travelers, budget). See the brief.
+1. Phase 3: results. Price pins on the globe and a ranked list, filtered by the search's budget and date window
+   (`fitsWindow`, `monthsInWindow`, `durationBucket` in `shared/dates.ts` are ready for this). See the brief.
+2. Publish: every commit so far carries `[skip ci]`, so no Expo update or Android build has been made. The owner
+   hasn't said whether to publish yet; ask before the first push without `[skip ci]`.
 
-## Not verified (needs a phone)
+## Not verified
 
-- Nothing has run in Expo Go. The Android bundle builds, types check and 34 unit tests pass, and the drawing code
-  was looked at as SVG pictures, but gestures, Skia drawing on the UI thread and speed are untested.
-- Speed: every frame re-projects the visible countries on the UI thread. If dragging stutters on the phone, the
-  first things to try are a lower `KEEP_50M` in `scripts/build-map-data.mjs` (fewer border points) and drawing
-  medium airports only above a higher zoom.
-- The first frame copies the border data to the UI thread once; a short pause when the app opens would be that.
-- The settings button is a "⚙" text character; if the phone's font draws it oddly, swap it for an icon.
-- The Worker has only been run in tests with made-up answers. The fixtures in `tests/fixtures/` were written by
-  hand from the SerpApi and Travelpayouts documentation and the fields listed in the brief, not captured from real
-  calls. If a real answer has a different shape, the debug screen will show an empty list or an error: save the
-  real answer as the fixture and adjust `shared/normalize.ts`.
-- The wording SerpApi uses for "no results" is matched loosely (`no results`, `empty results`, `hasn't returned
-  any results`); anything else is reported as an error.
-- `.github/workflows/worker.yml` relies on wrangler creating the KV namespace on the first deploy. If that step
-  fails, `worker/README.md` has the manual fallback.
-- The Worker's address in `app.json` (`https://kuda-worker.eligishvo.workers.dev`) is a guess based on the relay's
-  address; the debug screen lets you type the real one.
+- Phase 2b on a phone (calendar taps, the country list, the summary pill's size on a small screen).
+- Speed on other phones: the globe was smooth enough on the owner's phone that he reported no problem, but no
+  frame rate was measured. If dragging stutters, try a lower `KEEP_50M` in `scripts/build-map-data.mjs`.
+- The fixtures in `tests/fixtures/` were written by hand from the API documentation. The real calls worked on the
+  debug screen, but the fixtures have not been replaced with real captured answers.
+- "Explore Greece" and the "no results" wording were not reported on separately.
 
 ## Decisions and open questions
 
@@ -85,9 +92,13 @@ Built in phase 2:
   the UI thread during gestures, and the centre stays still by itself. Stereographic is conformal too (shapes stay
   true), and at regional zoom it looks the same as a conic map. d3-geo is still used for tap hit-testing. If the
   owner wants conic conformal specifically, it replaces `radial()` and the two projection formulas.
-- **Is Google's price per person or for everyone (adults > 1)?** Still open; needs real keys. The debug screen's
-  "Flights ×2 adults" button answers it. Until then the app asks Explore and estimates with 1 adult, so those
-  prices are per person.
+- **Is Google's price per person or for everyone (adults > 1)?** Still open: the owner said prices "seem to
+  work" but didn't report the two numbers. Compare "Flights" and "Flights ×2 adults" on the debug screen before
+  phase 4 shows totals. The app asks Explore and estimates with 1 adult, so those prices are per person.
+- **Several departure airports:** the search allows more than one, but Explore and the estimates take one origin
+  per call. Phase 3 has to decide: one call per airport (more searches) or only the first airport.
+- **Calendar:** written in the app (`src/ui/Calendar.tsx`) instead of adding a date-picker library, so it follows
+  the themes and needs no native code. Weeks start on Sunday.
 - **App token:** typed into the debug screen and kept on the phone, not stored in `app.json`, so it never reaches
   the repo or the update bundle. When there is a real search screen this may want a build-time setting instead.
 - **Russian routes** are hidden from Travelpayouts results by a list of Russian airport codes plus the A4 airline
@@ -115,6 +126,8 @@ None recorded yet (nothing has run on a phone).
 
 ## Changelog
 
+- **2026-11-12** — Phase 2b: search rules and saved state, Trip details screen, calendar, steppers, summary on
+  the map, departure rings from the search. 80 tests passing. Not yet tried on the phone.
 - **2026-11-12** — Owner ran the app in Expo Go: globe, selection, themes, settings and the debug screen's Usage
   all worked. Calls that reach SerpApi / Travelpayouts failed with "unexpected error": the Worker called
   Cloudflare's `fetch` as a property of an object, which Cloudflare refuses. Fixed (`REAL` in `handler.ts`), and

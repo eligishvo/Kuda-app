@@ -6,7 +6,7 @@ import { Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } fr
 import { addDays } from '../../shared/dates';
 import { ApiResult, Itinerary, Usage } from '../../shared/types';
 import { api, Connection } from '../api/client';
-import { DEPARTURE } from '../config';
+import { useSearch } from '../search/SearchContext';
 import { KEYS, load, save } from '../storage/store';
 import { useTheme } from '../theme/ThemeContext';
 import { FONTS, Theme, TOUCH } from '../theme/themes';
@@ -20,6 +20,8 @@ type Shown = { title: string; line: string; ok: boolean; json: string };
 
 export default function Debug() {
   const t = useTheme();
+  // Calls use the first departure airport of the current search
+  const DEPARTURE = { code: useSearch().search.departureAirports[0] };
   const [conn, setConn] = useState<Connection>({ url: DEFAULT_URL, token: '' });
   const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState('');

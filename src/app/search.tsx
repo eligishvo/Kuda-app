@@ -1,0 +1,162 @@
+// Trip details: where you fly from, when, for how long, how many people and the budget.
+// Every change is saved straight away; the map screen shows the summary.
+import { useMemo, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { addDays } from '../../shared/dates';
+import { airportsIn, countriesWithAirports } from '../map/mapData';
+import { LIMITS, nightsText, shortDate, travelersText } from '../search/search';
+import { useSearch } from '../search/SearchContext';
+import { useTheme } from '../theme/ThemeContext';
+import { FONTS, Theme, TOUCH } from '../theme/themes';
+import { Calendar } from '../ui/Calendar';
+import { Stepper } from '../ui/Stepper';
+
+export default function SearchScreen() {
+  const t = useTheme();
+  const { search, change } = useSearch();
+  const [picking, setPicking] = useState(false);
+  const [filter, setFilter] = useState('');
+  const today = new Date().toISOString().slice(0, 10);
+
+  const countries = useMemo(() => {
+    const q = filter.trim().toLowerCase();
+    return countriesWithAirports().filter((c) => !q || c.name.toLowerCase().includes(q));
+  }, [filter]);
+  const country = countriesWithAirports().find((c) => c.cc === search.departureCc);
+  const airports = airportsIn(search.departureCc);
+
+  const toggleAirport = (code: string) => {
+    const on = search.departureAirports.includes(code);
+    // At least one departure airport stays selected
+    if (on && search.departureAirports.length === 1) return;
+    change({ departureAirports: on ? search.departureAirports.filter((c) => c !== code) : [...search.departureAirports, code] });
+  };
+
+  return (
+    <ScrollView style={{ backgroundColor: t.background }} contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
+      <Text style={[styles.heading, { color: t.text }]}>Flying from</Text>
+      <Pressable
+        onPress={() => setPicking(!picking)}
+        accessibilityRole="button"
+        style={[styles.field, { backgroundColor: t.chip, borderColor: t.border }]}
+      >
+        <Text style={[styles.fieldText, { color: t.text }]}>{country?.name ?? search.departureCc}</Text>
+        <Text style={[styles.fieldText, { color: t.muted }]}>{picking ? 'Close' : 'Change'}</Text>
+      </Pressable>
+      {picking && (
+        <View style={[styles.picker, { backgroundColor: t.panel, borderColor: t.border }]}>
+          <TextInput
+            value={filter}
+            onChangeText={setFilter}
+            placeholder="Search countries"
+            placeholderTextColor={t.muted}
+            autoCorrect={false}
+            style={[styles.input, { backgroundColor: t.chip, borderColor: t.border, color: t.text }]}
+          />
+          <ScrollView style={styles.countries} nestedScrollEnabled keyboardShouldPersistTaps="handled">
+            {countries.map((c) => (
+              <Pressable
+                key={c.cc}
+                onPress={() => {
+                  // A new country starts with one of its large airports selected (the search rules pick it)
+                  change({ departureCc: c.cc, departureAirports: [] });
+                  setPicking(false);
+                  setFilter('');
+                }}
+                accessibilityRole="button"
+                style={[styles.country, { borderColor: t.border }]}
+              >
+                <Text style={[styles.fieldText, { color: c.cc === search.departureCc ? t.price : t.text }]}>{c.name}</Text>
+                <Text style={[styles.small, { color: t.muted }]}>{c.count} {c.count === 1 ? 'airport' : 'airports'}</Text>
+              </Pressable>
+            ))}
+            {countries.length === 0 && <Text style={[styles.small, { color: t.muted, padding: 12 }]}>No country matches.</Text>}
+          </ScrollView>
+        </View>
+      )}
+      <Text style={[styles.small, { color: t.muted }]}>Airports to fly from (pick one or more):</Text>
+      <View style={styles.chips}>
+        {airports.map((a) => {
+          const on = search.departureAirports.includes(a.code);
+          return (
+            <Pressable
+              key={a.code}
+              onPress={() => toggleAirport(a.code)}
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: on }}
+              style={[styles.chip, { backgroundColor: on ? t.accent : t.chip, borderColor: on ? t.accent : t.border }]}
+            >
+              <Text style={[styles.chipText, { color: on ? t.buttonText : t.text }]}>{a.code}</Text>
+              <Text style={[styles.small, { color: on ? t.buttonText : t.muted }]} numberOfLines={1}>{a.city || a.name}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      <Text style={[styles.heading, { color: t.text }]}>When</Text>
+      <Text style={[styles.body, { color: t.text }]}>
+        Leave on or after {shortDate(search.earliestOut)}, back by {shortDate(search.latestRet)}
+      </Text>
+      <Calendar
+        theme={t}
+        from={search.earliestOut}
+        to={search.latestRet}
+        min={today}
+        max={addDays(today, LIMITS.horizonDays)}
+        onChange={(earliestOut, latestRet) => change({ earliestOut, latestRet })}
+      />
+      <Text style={[styles.small, { color: t.muted }]}>Prices are only available for about the next six months.</Text>
+
+      <Text style={[styles.heading, { color: t.text }]}>Trip length</Text>
+      <Stepper theme={t} label="Shortest" value={search.minNights} text={`${search.minNights} nights`} min={LIMITS.nights.min} max={search.maxNights} onChange={(minNights) => change({ minNights })} />
+      <Stepper theme={t} label="Longest" value={search.maxNights} text={`${search.maxNights} nights`} min={search.minNights} max={LIMITS.nights.max} onChange={(maxNights) => change({ maxNights })} />
+
+      <Text style={[styles.heading, { color: t.text }]}>Travelers and budget</Text>
+      <Stepper theme={t} label="Travelers" value={search.adults} min={LIMITS.adults.min} max={LIMITS.adults.max} onChange={(adults) => change({ adults })} />
+      <Stepper
+        theme={t}
+        label="Budget per person, round trip"
+        value={search.budget}
+        text={`$${search.budget}`}
+        min={LIMITS.budget.min}
+        max={LIMITS.budget.max}
+        step={LIMITS.budget.step}
+        onChange={(budget) => change({ budget })}
+      />
+
+      <Summary theme={t} lines={[
+        `From ${search.departureAirports.join(', ')}`,
+        `${shortDate(search.earliestOut)} – ${shortDate(search.latestRet)}, ${nightsText(search)}`,
+        `${travelersText(search.adults)}, up to $${search.budget} each${search.adults > 1 ? ` ($${search.budget * search.adults} in total)` : ''}`,
+      ]} />
+    </ScrollView>
+  );
+}
+
+function Summary({ theme: t, lines }: { theme: Theme; lines: string[] }) {
+  return (
+    <View style={[styles.summary, { backgroundColor: t.panel, borderColor: t.border }]}>
+      <Text style={[styles.small, { color: t.muted }]}>Saved automatically. Destinations are picked on the map.</Text>
+      {lines.map((l) => (
+        <Text key={l} style={[styles.body, { color: t.text }]}>{l}</Text>
+      ))}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  page: { padding: 16, paddingBottom: 48, gap: 10 },
+  heading: { fontFamily: FONTS.heading, fontSize: 20, marginTop: 14 },
+  body: { fontFamily: FONTS.body, fontSize: 15, lineHeight: 21 },
+  small: { fontFamily: FONTS.body, fontSize: 12, lineHeight: 17 },
+  field: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, minHeight: TOUCH + 4 },
+  fieldText: { fontFamily: FONTS.bodyMedium, fontSize: 15 },
+  picker: { borderWidth: 1, borderRadius: 14, padding: 10, gap: 8 },
+  input: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, minHeight: TOUCH + 4, fontFamily: FONTS.body, fontSize: 15 },
+  countries: { maxHeight: 280 },
+  country: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', minHeight: TOUCH + 2, borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: 4 },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  chip: { borderWidth: 1, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 6, minHeight: TOUCH, justifyContent: 'center', maxWidth: '48%' },
+  chipText: { fontFamily: FONTS.bodyBold, fontSize: 15 },
+  summary: { borderWidth: 1, borderRadius: 14, padding: 12, gap: 4, marginTop: 16 },
+});

@@ -6,7 +6,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { LayoutChangeEvent, StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { cancelAnimation, runOnJS, useDerivedValue, useSharedValue, withDecay } from 'react-native-reanimated';
-import { DEPARTURE, START_VIEW } from '../config';
+import { START_VIEW } from '../config';
 import { Theme } from '../theme/themes';
 import { drawAirports, drawCountries, drawGraticule } from './draw';
 import { Hit, hitTest } from './hitTest';
@@ -25,11 +25,13 @@ type Props = {
   flagsHigh: number[];
   /** Per airport: 1 when selected. */
   airportFlags: number[];
+  /** The departure airports as lon, lat, lon, lat… Each gets a ring. */
+  departures: number[];
   /** Called with what was tapped (null for sea or space) and whether the map was flat at the time. */
   onHit: (hit: Hit, flat: boolean) => void;
 };
 
-export function GlobeMap({ theme, flagsLow, flagsHigh, airportFlags, onHit }: Props) {
+export function GlobeMap({ theme, flagsLow, flagsHigh, airportFlags, departures, onHit }: Props) {
   const [size, setSize] = useState({ w: 0, h: 0 });
   const w = size.w;
   const h = size.h;
@@ -50,6 +52,8 @@ export function GlobeMap({ theme, flagsLow, flagsHigh, airportFlags, onHit }: Pr
   useEffect(() => { low.value = flagsLow; }, [flagsLow, low]);
   useEffect(() => { high.value = flagsHigh; }, [flagsHigh, high]);
   useEffect(() => { chosenAirports.value = airportFlags; }, [airportFlags, chosenAirports]);
+  const from = useSharedValue(departures);
+  useEffect(() => { from.value = departures; }, [departures, from]);
 
   // One calculation per frame builds every shape on the map
   const frame = useDerivedValue(() => {
@@ -65,7 +69,15 @@ export function GlobeMap({ theme, flagsLow, flagsHigh, airportFlags, onHit }: Pr
     drawCountries(detailed ? GEO_HIGH : GEO_LOW, v, detailed ? high.value : low.value, [land, selected, partial, home]);
     drawGraticule(GRATICULE, v, graticule);
     drawAirports(AIRPORT_GEO, v, chosenAirports.value, dots, chosen);
-    const dep = project(v, DEPARTURE.lon, DEPARTURE.lat);
+    const depDots = Skia.PathBuilder.Make();
+    const depRings = Skia.PathBuilder.Make();
+    for (let i = 0; i + 1 < from.value.length; i += 2) {
+      const p = project(v, from.value[i], from.value[i + 1]);
+      if (p) {
+        depDots.addCircle(p.x, p.y, 3);
+        depRings.addCircle(p.x, p.y, 7);
+      }
+    }
     return {
       land: land.build(),
       selected: selected.build(),
@@ -77,8 +89,8 @@ export function GlobeMap({ theme, flagsLow, flagsHigh, airportFlags, onHit }: Pr
       rim: v.R * (1 + v.t),
       R: v.R,
       t: v.t,
-      depX: dep ? dep.x : -100,
-      depY: dep ? dep.y : -100,
+      depDots: depDots.build(),
+      depRings: depRings.build(),
     };
   });
   const land = useDerivedValue(() => frame.value.land);
@@ -91,8 +103,8 @@ export function GlobeMap({ theme, flagsLow, flagsHigh, airportFlags, onHit }: Pr
   const rim = useDerivedValue(() => frame.value.rim);
   const flatness = useDerivedValue(() => frame.value.t);
   const glow = useDerivedValue(() => theme.rimGlowOpacity * (1 - frame.value.t));
-  const depX = useDerivedValue(() => frame.value.depX);
-  const depY = useDerivedValue(() => frame.value.depY);
+  const depDots = useDerivedValue(() => frame.value.depDots);
+  const depRings = useDerivedValue(() => frame.value.depRings);
   // The globe is lit from the top left
   const lightAt = useDerivedValue(() => Skia.Point(w / 2 - frame.value.R * 0.35, h / 2 - frame.value.R * 0.35));
   const lightReach = useDerivedValue(() => frame.value.R * 1.5);
@@ -196,9 +208,9 @@ export function GlobeMap({ theme, flagsLow, flagsHigh, airportFlags, onHit }: Pr
             <Circle cx={cx} cy={cy} r={rim} style="stroke" strokeWidth={1} color={theme.rim} />
             <Path path={dots} color={theme.airportOther} />
             <Path path={chosen} color={theme.airportSelected} />
-            {/* Departure airport */}
-            <Circle cx={depX} cy={depY} r={3} color={theme.departureRing} />
-            <Circle cx={depX} cy={depY} r={7} style="stroke" strokeWidth={1.5} color={theme.departureRing} />
+            {/* Departure airports */}
+            <Path path={depDots} color={theme.departureRing} />
+            <Path path={depRings} style="stroke" strokeWidth={1.5} color={theme.departureRing} />
           </Canvas>
         )}
       </View>
