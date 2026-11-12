@@ -94,9 +94,9 @@ export function shortDate(d: DateText): string {
 }
 
 export const nightsText = (s: Search) => (s.minNights === s.maxNights ? `${s.minNights} nights` : `${s.minNights}–${s.maxNights} nights`);
-export const travelersText = (n: number) => (n === 1 ? '1 traveler' : `${n} travelers`);
+export const travelersText = (n: number) => (n === 1 ? '1 adult' : `${n} adults`);
 
-/** The one-line summary shown on the map, e.g. "TLV · 26 Nov – 11 Jan · 5–9 nights · 1 traveler · up to $400". */
+/** The one-line summary shown on the map, e.g. "TLV · 26 Nov – 11 Jan · 5–9 nights · 1 adult · up to $400". */
 export function summary(s: Search): string {
   return [
     s.departureAirports.join(', '),

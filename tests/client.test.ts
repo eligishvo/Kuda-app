@@ -30,6 +30,19 @@ describe('Worker client', () => {
     expect(f.seen.every((s) => s.headers['X-App-Token'] === 'app-token')).toBe(true);
   });
 
+  it('adds the fly-back airport only when it differs from the arrival airport', async () => {
+    const f = fake({ ok: true, data: [], cached: false, usage: { date: '2026-11-12', used: 0, cap: 40 } });
+    const q = { origin: 'TLV', dest: 'ATH', out: '2026-12-07', ret: '2026-12-14' };
+    await api.flights(conn, { ...q, back: 'SKG' }, f.fn);
+    await api.flights(conn, { ...q, back: 'ATH' }, f.fn);
+    await api.returns(conn, { ...q, back: 'SKG', departureToken: 'tok' }, f.fn);
+    expect(f.seen.map((s) => s.url.split('?')[1])).toEqual([
+      'origin=TLV&dest=ATH&out=2026-12-07&ret=2026-12-14&back=SKG',
+      'origin=TLV&dest=ATH&out=2026-12-07&ret=2026-12-14',
+      'origin=TLV&dest=ATH&out=2026-12-07&ret=2026-12-14&back=SKG&departure_token=tok',
+    ]);
+  });
+
   it('passes the Worker’s own errors through', async () => {
     const f = fake({ ok: false, error: 'Daily search limit reached (40).', usage: { date: '2026-11-12', used: 40, cap: 40 } }, 429);
     expect(await api.explore(conn, { origin: 'TLV', month: 12, duration: 2 }, f.fn)).toMatchObject({ ok: false, error: 'Daily search limit reached (40).', usage: { used: 40 } });

@@ -95,10 +95,10 @@ export function compare(list: Itinerary[]): Comparison {
   };
 }
 
-/** The chosen flights, ready to hand to the trip planner. */
-export function buildTrip(origin: string, destination: string, adults: number, outbound: Itinerary, inbound: Itinerary): TripSelection {
-  // Google shows the round-trip price on the return option; fall back to the outbound's if it has none
-  return { origin, destination, adults, outbound, inbound, price: inbound.price ?? outbound.price };
+/** The chosen flights, ready to hand to the trip planner. `returnFrom` is the airport flown home from. */
+export function buildTrip(origin: string, destination: string, returnFrom: string, adults: number, outbound: Itinerary, inbound: Itinerary): TripSelection {
+  // Google shows the whole trip's price on the return option; fall back to the outbound's if it has none
+  return { origin, destination, returnFrom, adults, outbound, inbound, price: inbound.price ?? outbound.price };
 }
 
 /** Cleans a trip read from storage; null when it isn't one. */
@@ -109,9 +109,49 @@ export function sanitizeTrip(raw: unknown): TripSelection | null {
   return {
     origin: t.origin,
     destination: t.destination,
+    returnFrom: typeof t.returnFrom === 'string' ? t.returnFrom : t.destination,
     adults: typeof t.adults === 'number' ? t.adults : 1,
     outbound: t.outbound,
     inbound: t.inbound,
     price: typeof t.price === 'number' ? t.price : null,
   };
+}
+
+type Place = { code: string; name: string; city: string; cc: string; lat: number; lon: number };
+
+/** Distance between two places in kilometres (straight line over the globe). */
+export function distanceKm(a: { lat: number; lon: number }, b: { lat: number; lon: number }): number {
+  const rad = Math.PI / 180;
+  const h = Math.sin(((b.lat - a.lat) * rad) / 2) ** 2 + Math.cos(a.lat * rad) * Math.cos(b.lat * rad) * Math.sin(((b.lon - a.lon) * rad) / 2) ** 2;
+  return 2 * 6371 * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+
+/** The airports from `candidates` closest to `from`, nearest first (never `from` itself). */
+export function nearest<T extends Place>(from: Place, candidates: T[], count: number): T[] {
+  return candidates
+    .filter((c) => c.code !== from.code)
+    .map((c) => ({ c, d: distanceKm(from, c) }))
+    .sort((x, y) => x.d - y.d)
+    .slice(0, count)
+    .map((x) => x.c);
+}
+
+/** Airports matching what was typed: an exact code first, then cities that start with it, then anything containing it. */
+export function findAirports<T extends Place>(typed: string, airports: T[], count = 8): T[] {
+  const q = typed.trim().toLowerCase();
+  if (q.length < 2) return [];
+  const score = (a: T) => {
+    const city = a.city.toLowerCase();
+    if (a.code.toLowerCase() === q) return 0;
+    if (city.startsWith(q)) return 1;
+    if (city.includes(q)) return 2;
+    if (a.name.toLowerCase().includes(q)) return 3;
+    return -1;
+  };
+  return airports
+    .map((a) => ({ a, s: score(a) }))
+    .filter((x) => x.s >= 0)
+    .sort((x, y) => x.s - y.s || x.a.city.localeCompare(y.a.city))
+    .slice(0, count)
+    .map((x) => x.a);
 }

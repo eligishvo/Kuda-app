@@ -4,7 +4,8 @@ import { ApiResult, Destination, Itinerary, Usage } from '../../shared/types';
 
 export type Connection = { url: string; token: string };
 
-export type FlightQuery = { origin: string; dest: string; out: string; ret: string; adults?: number };
+/** `back` is the airport to fly home from, when it isn't the arrival airport. */
+export type FlightQuery = { origin: string; dest: string; out: string; ret: string; adults?: number; back?: string };
 
 function query(params: Record<string, string | number | undefined>): string {
   const parts = Object.entries(params)
@@ -33,7 +34,8 @@ export const api = {
     get<Destination[]>(c, `/explore${query(p)}`, f),
   estimates: (c: Connection, p: { origin: string; from: string; to: string }, f?: typeof fetch) =>
     get<Destination[]>(c, `/estimates${query(p)}`, f),
-  flights: (c: Connection, p: FlightQuery, f?: typeof fetch) => get<Itinerary[]>(c, `/flights${query(p)}`, f),
+  flights: (c: Connection, p: FlightQuery, f?: typeof fetch) =>
+    get<Itinerary[]>(c, `/flights${query({ ...p, back: p.back && p.back !== p.dest ? p.back : undefined })}`, f),
   returns: (c: Connection, p: FlightQuery & { departureToken: string }, f?: typeof fetch) =>
-    get<Itinerary[]>(c, `/returns${query({ origin: p.origin, dest: p.dest, out: p.out, ret: p.ret, adults: p.adults, departure_token: p.departureToken })}`, f),
+    get<Itinerary[]>(c, `/returns${query({ origin: p.origin, dest: p.dest, out: p.out, ret: p.ret, adults: p.adults, back: p.back && p.back !== p.dest ? p.back : undefined, departure_token: p.departureToken })}`, f),
 };

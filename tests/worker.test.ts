@@ -145,6 +145,29 @@ describe('Worker: endpoints', () => {
     expect(net.calls[0].searchParams.get('departure_token')).toBe('TOKEN-DIRECT');
   });
 
+  it('flying back from another airport becomes a two-leg multi-city search, cached separately', async () => {
+    const { call, net, kv } = setup();
+    const r = await call('/flights?origin=TLV&dest=ATH&out=2026-12-07&ret=2026-12-14&back=SKG');
+    expect(r.status).toBe(200);
+    const p = Object.fromEntries(net.calls[0].searchParams);
+    expect(p).toMatchObject({ engine: 'google_flights', type: '3', adults: '1' });
+    expect(JSON.parse(p.multi_city_json)).toEqual([
+      { departure_id: 'TLV', arrival_id: 'ATH', date: '2026-12-07' },
+      { departure_id: 'SKG', arrival_id: 'TLV', date: '2026-12-14' },
+    ]);
+    // Multi-city searches must not carry the round-trip fields
+    expect(p.departure_id).toBeUndefined();
+    expect(p.return_date).toBeUndefined();
+    expect(kv.data.has('flights:TLV:ATH:2026-12-07:2026-12-14:1:SKG')).toBe(true);
+    // The second leg uses the same search plus the token
+    await call('/returns?origin=TLV&dest=ATH&out=2026-12-07&ret=2026-12-14&back=SKG&departure_token=TOKEN-DIRECT');
+    expect(Object.fromEntries(net.calls[1].searchParams)).toMatchObject({ type: '3', departure_token: 'TOKEN-DIRECT' });
+    // back = the arrival airport is a plain round trip
+    await call('/flights?origin=TLV&dest=ATH&out=2026-12-07&ret=2026-12-14&back=ATH');
+    expect(net.calls[2].searchParams.get('type')).toBe('1');
+    expect((await call('/flights?origin=TLV&dest=ATH&out=2026-12-07&ret=2026-12-14&back=Salonika')).status).toBe(400);
+  });
+
   it('never returns the API keys', async () => {
     const { call } = setup();
     const text = JSON.stringify([

@@ -7,7 +7,7 @@ caches answers in Cloudflare KV, and stops after a set number of SerpApi searche
 |---|---|---|---|
 | `/explore?origin&month&duration&adults&area?` | Cheapest destinations for a month (`Destination[]`) | SerpApi Google Travel Explore | 12 h |
 | `/estimates?origin&from&to` (months, `2026-12`) | Cached round trips to everywhere (`Destination[]`) | Travelpayouts | 12 h |
-| `/flights?origin&dest&out&ret&adults` | Outbound options with `departureToken` (`Itinerary[]`) | SerpApi Google Flights | 1 h |
+| `/flights?origin&dest&out&ret&adults&back?` | Outbound options with `departureToken` (`Itinerary[]`). `back` = airport to fly home from, when different from `dest` | SerpApi Google Flights | 1 h |
 | `/returns?…&departure_token` | Return options for one outbound flight (`Itinerary[]`) | SerpApi Google Flights | 1 h |
 | `/usage` | Today's SerpApi searches and the cap | KV | — |
 

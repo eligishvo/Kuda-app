@@ -5,8 +5,11 @@ import * as Updates from 'expo-updates';
 import { useState } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { buildReport, checkReport, LIMITS, REPORT_PRIVACY, sendReport } from '../report/report';
+import { LIMITS as TRIP_LIMITS } from '../search/search';
+import { useSearch } from '../search/SearchContext';
 import { useSetTheme, useTheme } from '../theme/ThemeContext';
 import { FONTS, Theme, THEME_IDS, THEMES, TOUCH } from '../theme/themes';
+import { Stepper } from '../ui/Stepper';
 
 const RELAY: string = Constants.expoConfig?.extra?.highCommand?.reportUrl ?? '';
 const VERSION = Constants.expoConfig?.version ?? '?';
@@ -14,6 +17,7 @@ const VERSION = Constants.expoConfig?.version ?? '?';
 export default function Settings() {
   const t = useTheme();
   const setTheme = useSetTheme();
+  const { search, change } = useSearch();
   return (
     <ScrollView style={{ backgroundColor: t.background }} contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
       <Text style={[styles.heading, { color: t.text }]}>Theme</Text>
@@ -41,6 +45,8 @@ export default function Settings() {
       <ReportForm theme={t} />
 
       <Text style={[styles.heading, { color: t.text }]}>Trip</Text>
+      {/* The same number as in Trip details: prices are checked for this many adults */}
+      <Stepper theme={t} label="Adults" value={search.adults} min={TRIP_LIMITS.adults.min} max={TRIP_LIMITS.adults.max} onChange={(adults) => change({ adults })} />
       <Pressable
         onPress={() => router.push('/planner')}
         accessibilityRole="button"

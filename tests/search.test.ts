@@ -17,9 +17,9 @@ describe('search: defaults', () => {
   });
 
   it('writes the one-line summary', () => {
-    expect(summary(defaultSearch(TODAY))).toBe('TLV · 26 Nov – 11 Jan · 5–9 nights · 1 traveler · up to $400');
+    expect(summary(defaultSearch(TODAY))).toBe('TLV · 26 Nov – 11 Jan · 5–9 nights · 1 adult · up to $400');
     expect(summary({ ...defaultSearch(TODAY), minNights: 7, maxNights: 7, adults: 2, departureAirports: ['ETM', 'TLV'] })).toBe(
-      'ETM, TLV · 26 Nov – 11 Jan · 7 nights · 2 travelers · up to $400',
+      'ETM, TLV · 26 Nov – 11 Jan · 7 nights · 2 adults · up to $400',
     );
     expect(shortDate('2026-12-07')).toBe('7 Dec');
   });

@@ -111,8 +111,8 @@ export default function SearchScreen() {
       <Stepper theme={t} label="Shortest" value={search.minNights} text={`${search.minNights} nights`} min={LIMITS.nights.min} max={search.maxNights} onChange={(minNights) => change({ minNights })} />
       <Stepper theme={t} label="Longest" value={search.maxNights} text={`${search.maxNights} nights`} min={search.minNights} max={LIMITS.nights.max} onChange={(maxNights) => change({ maxNights })} />
 
-      <Text style={[styles.heading, { color: t.text }]}>Travelers and budget</Text>
-      <Stepper theme={t} label="Travelers" value={search.adults} min={LIMITS.adults.min} max={LIMITS.adults.max} onChange={(adults) => change({ adults })} />
+      <Text style={[styles.heading, { color: t.text }]}>Adults and budget</Text>
+      <Stepper theme={t} label="Adults" value={search.adults} min={LIMITS.adults.min} max={LIMITS.adults.max} onChange={(adults) => change({ adults })} />
       <Stepper
         theme={t}
         label="Budget per person, round trip"

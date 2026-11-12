@@ -5,10 +5,11 @@ Spec: `docs/BRIEF.md`. Rules: `AGENTS.md`.
 
 ## Status (2026-11-12)
 
-**All phases of the brief are written (1, 2, 2b, 3, 4 and 5), except the Android preview build and the first
-Expo update, which wait for the owner's go-ahead.** Phases 1 and 2 were run by the owner on his phone in Expo Go
-and against the deployed Worker with real keys on 2026-11-12 and worked. Phases 2b, 3, 4 and 5 pass the checks
-(typecheck, 105 tests, Android bundle) but have **not been tried on the phone yet**.
+**All phases of the brief are written (1, 2, 2b, 3, 4 and 5), plus two owner requests from 2026-11-12: an
+Adults setting and flying back from a different airport.** Phases 1 and 2 were run by the owner on his phone in
+Expo Go and against the deployed Worker with real keys and worked. Everything after that passes the checks
+(typecheck, 110 tests, Android bundle, Worker dry-run build) but has **not been tried on the phone yet**.
+The first Expo update and Android preview build were started by the commit that added this note.
 
 Built in phase 1:
 - Expo SDK 58 project (`kuda`, owner `elidesigninc`), Expo Router, TypeScript, vitest, same versions as Mechanoplanner.
@@ -72,6 +73,16 @@ Built in phases 4 and 5:
 - High Command registration and the problem-report button were done in phase 1.
 - Not done: the Android preview build (`[build]`) and publishing the Expo update.
 
+Added after the brief (owner's requests):
+- **Adults:** the number of adults is in Trip details and also in Settings → Trip. Live flight checks use it.
+  Wording is "adults" everywhere.
+- **Fly back from another airport ("open jaw"):** on the destination screen, "Fly back from" offers the same
+  airport, the other selected destinations nearest to the arrival airport, or any airport by search. The Worker's
+  `/flights` and `/returns` take `back=<IATA>`; when it differs from `dest` they ask Google for a two-leg
+  multi-city trip (`type=3`, `multi_city_json`). `TripSelection.returnFrom` records it; the Planner shows it.
+  Open-jaw prices exist only as live checks: the map's price pins and list are always plain round trips, because
+  Google Explore and Travelpayouts only price round trips.
+
 ## How to test on a phone
 
 1. In the repo folder: `git pull`, `npm install`, `npx expo start`.
@@ -96,6 +107,14 @@ searches). Tap a date row to see its outbound flights; tap one ("See returns", 1
 ("Choose"): the Planner opens with both flights. Go back to the map, open Settings → Chosen flights: the same
 trip is there. For a "no estimate" airport the button says "Check flights".
 
+## How to test flying back from another airport
+
+Select two countries or a few airports, search, open a destination ("Compare flights"). Under "Fly back from"
+tap another airport (or "Other airport…" and type a city): the three dates are checked again for arriving at
+one and leaving from the other (about 3 searches). Pick an outbound, then a return (it leaves from the other
+airport), "Choose": the Planner says "… back from …". Tap "Same airport" to go back to the round trip (free:
+it was already loaded).
+
 ## How to test phase 3
 
 Needs the Worker address and token saved on the debug screen. Select Greece and Italy, tap "Search flights":
@@ -112,15 +131,18 @@ rings on the map should follow. Close and reopen the app: the search should stil
 
 ## Next
 
-1. The owner tests phases 2b to 5 on the phone; fix what turns up.
-2. Publish: every commit so far carries `[skip ci]`, so no Expo update or Android build exists. When the owner
-   says go, push a commit without `[skip ci]` and with `[build]` (needs the `EXPO_TOKEN` secret, which is set).
-3. Answer the per-person price question (below) and then show totals for more than one traveler.
+1. The owner tests phases 2b to 5 and the two additions on the phone (Expo Go or the new preview build); fix
+   what turns up.
+2. Check that the first GitHub run linked the Expo project (it commits `app.json` with the project id), built
+   the Android preview app and published the update. After it, `git pull` before working.
+3. Answer the per-person price question (below) and then show totals for more than one adult.
 4. Later ideas, only if the owner asks: robots for High Command's Bots tab; the real trip planner.
 
 ## Not verified
 
 - Phase 2b on a phone (calendar taps, the country list, the summary pill's size on a small screen).
+- Multi-city answers from Google: the open-jaw calls were only run in tests with made-up answers. If the real
+  second-leg answer has a different shape (for example no price on the options), the return list will show it.
 - Phases 4 and 5 on a phone and against real answers: the destination screen's sequence of live checks, the
   returns list (real `departure_token`s are long; they travel in the address of the Worker call), the Planner.
 - Phase 3 on a phone: pins following the map, pin taps, the results list, and how many Google results actually
@@ -182,6 +204,10 @@ None recorded yet (nothing has run on a phone).
 
 ## Changelog
 
+- **2026-11-12** — Owner's requests: Adults also in Settings; fly back from a different airport (Worker `back`
+  parameter with multi-city search, chooser on the destination screen, `returnFrom` in the saved trip). 110 tests.
+  Owner said to publish: this commit runs the checks, publishes the first Expo update and starts the first
+  Android preview build (`[build]`), and redeploys the Worker.
 - **2026-11-12** — Phases 4 and 5: destination screen with live date checks, outbound and return lists and a
   date comparison; chosen flights saved as `TripSelection` and shown on a placeholder Planner. 105 tests passing.
   Not yet on a phone; no build or update published.

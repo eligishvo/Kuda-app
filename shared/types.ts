@@ -72,7 +72,10 @@ export type Itinerary = {
 /** What the user picked: handed to the trip planner. */
 export type TripSelection = {
   origin: string;
+  /** The airport you arrive at… */
   destination: string;
+  /** …and the one you fly home from (the same airport for a plain round trip). */
+  returnFrom: string;
   adults: number;
   outbound: Itinerary;
   inbound: Itinerary;

@@ -1,15 +1,19 @@
 // One destination: live flight checks on up to three date pairs, the outbound options for each, the return
 // options for an outbound you pick, and a comparison of price, time and stops between the dates.
+// "Fly back from" lets the return leave from a different airport than the one you arrive at.
 // Each live check and each list of returns is one SerpApi search (free when repeated within the hour).
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Itinerary, Usage } from '../../shared/types';
 import { api, Connection } from '../api/client';
 import {
-  airlinesText, arrivalDayShift, buildTrip, clock, compare, DatePair, datePairs, decodePairs, durationText, routeText, stopsLine,
+  airlinesText, arrivalDayShift, buildTrip, clock, compare, DatePair, datePairs, decodePairs, durationText, findAirports,
+  nearest, routeText, stopsLine,
 } from '../flights/flights';
-import { airportByCode, airportLabel } from '../map/mapData';
+import { Airport, airportByCode, airportCodesIn, airportLabel, AIRPORTS } from '../map/mapData';
+import { selectedAirports } from '../selection/selection';
+import { useSelection } from '../selection/useSelection';
 import { windowOf } from '../results/results';
 import { shortDate, travelersText } from '../search/search';
 import { useSearch } from '../search/SearchContext';
@@ -19,7 +23,10 @@ import { FONTS, Theme, TOUCH } from '../theme/themes';
 
 type Loaded = { status: 'waiting' | 'loading' | 'done'; list: Itinerary[]; error: string | null; cached: boolean };
 const WAITING: Loaded = { status: 'waiting', list: [], error: null, cached: false };
-const keyOf = (p: DatePair) => `${p.out}_${p.ret}`;
+/** Results are kept per fly-back airport and date pair, so switching back and forth doesn't search again. */
+const keyOf = (back: string, p: DatePair) => `${back}|${p.out}_${p.ret}`;
+/** How many of the selected airports are offered as "fly back from". */
+const NEARBY = 6;
 /** How many options are listed before "Show all". */
 const SHOWN = 5;
 
@@ -39,21 +46,29 @@ export default function DestinationScreen() {
   const [conn, setConn] = useState<Connection | null>(null);
   const [usage, setUsage] = useState<Usage | null>(null);
   const [outbound, setOutbound] = useState<Record<string, Loaded>>({});
-  const [open, setOpen] = useState(keyOf(pairs[0] ?? { out: '', ret: '' }));
+  /** The airport to fly home from: the arrival airport unless the user picks another. */
+  const [back, setBack] = useState(code);
+  const [finding, setFinding] = useState(false);
+  const [typed, setTyped] = useState('');
+  const [selection] = useSelection();
+  const [openPair, setOpenPair] = useState<DatePair | undefined>(pairs[0]);
+  const open = openPair ? keyOf(back, openPair) : '';
   /** The outbound flight picked for each date pair, and the returns loaded for it. */
   const [picked, setPicked] = useState<Record<string, Itinerary>>({});
   const [returns, setReturns] = useState<Record<string, Loaded>>({});
   const [showAll, setShowAll] = useState<Record<string, boolean>>({});
   const started = useRef(false);
+  /** Fly-back airports whose date pairs have been (or are being) checked. */
+  const checked = useRef(new Set<string>());
 
   const check = useCallback(
-    async (c: Connection, p: DatePair) => {
-      setOutbound((o) => ({ ...o, [keyOf(p)]: { ...WAITING, status: 'loading' } }));
-      const r = await api.flights(c, { origin, dest: code, out: p.out, ret: p.ret, adults: search.adults });
+    async (c: Connection, from: string, p: DatePair) => {
+      setOutbound((o) => ({ ...o, [keyOf(from, p)]: { ...WAITING, status: 'loading' } }));
+      const r = await api.flights(c, { origin, dest: code, back: from, out: p.out, ret: p.ret, adults: search.adults });
       if (r.usage) setUsage(r.usage);
       setOutbound((o) => ({
         ...o,
-        [keyOf(p)]: r.ok ? { status: 'done', list: r.data, error: null, cached: r.cached } : { status: 'done', list: [], error: r.error, cached: false },
+        [keyOf(from, p)]: r.ok ? { status: 'done', list: r.data, error: null, cached: r.cached } : { status: 'done', list: [], error: r.error, cached: false },
       }));
     },
     [origin, code, search.adults],
@@ -70,19 +85,41 @@ export default function DestinationScreen() {
         return;
       }
       setConn(c);
-      for (const p of pairs) await check(c, p);
+      checked.current.add(code);
+      for (const p of pairs) await check(c, code, p);
     })();
-  }, [pairs, check]);
+  }, [pairs, check, code]);
+
+  // Choosing another airport to fly back from checks the same dates again for that combination
+  const flyBackFrom = async (from: string) => {
+    setBack(from);
+    setFinding(false);
+    setTyped('');
+    if (!conn?.url || !conn?.token || checked.current.has(from)) return;
+    checked.current.add(from);
+    for (const p of pairs) await check(conn, from, p);
+  };
+
+  // Offered as fly-back airports: the other selected destinations, nearest to the arrival airport first
+  const others: Airport[] = airport
+    ? nearest(
+        airport,
+        selectedAirports(selection, airportCodesIn).map(airportByCode).filter((a): a is Airport => a != null && a.cc !== search.departureCc),
+        NEARBY,
+      )
+    : [];
+  const backOptions = [...(back !== code && !others.some((a) => a.code === back) ? [airportByCode(back)].filter((a): a is Airport => a != null) : []), ...others];
+  const matches = finding ? findAirports(typed, AIRPORTS).filter((a) => a.code !== code && a.cc !== search.departureCc) : [];
 
   const pickOutbound = async (p: DatePair, it: Itinerary) => {
-    const k = keyOf(p);
+    const k = keyOf(back, p);
     setPicked((x) => ({ ...x, [k]: it }));
     if (!conn || !it.departureToken) {
       setReturns((x) => ({ ...x, [k]: { status: 'done', list: [], error: 'Google gave no way to list returns for this flight.', cached: false } }));
       return;
     }
     setReturns((x) => ({ ...x, [k]: { ...WAITING, status: 'loading' } }));
-    const r = await api.returns(conn, { origin, dest: code, out: p.out, ret: p.ret, adults: search.adults, departureToken: it.departureToken });
+    const r = await api.returns(conn, { origin, dest: code, back, out: p.out, ret: p.ret, adults: search.adults, departureToken: it.departureToken });
     if (r.usage) setUsage(r.usage);
     setReturns((x) => ({
       ...x,
@@ -91,9 +128,9 @@ export default function DestinationScreen() {
   };
 
   const choose = async (p: DatePair, inbound: Itinerary) => {
-    const out = picked[keyOf(p)];
+    const out = picked[keyOf(back, p)];
     if (!out) return;
-    await save(KEYS.trip, buildTrip(origin, code, search.adults, out, inbound));
+    await save(KEYS.trip, buildTrip(origin, code, back, search.adults, out, inbound));
     router.push('/planner');
   };
 
@@ -117,18 +154,53 @@ export default function DestinationScreen() {
         </Text>
       )}
 
+      {/* Where the return leaves from */}
+      <Text style={[styles.section, { color: t.text }]}>Fly back from</Text>
+      <View style={styles.chips}>
+        <Chip theme={t} on={back === code} label={`Same airport (${code})`} onPress={() => flyBackFrom(code)} />
+        {backOptions.map((a) => (
+          <Chip key={a.code} theme={t} on={back === a.code} label={`${a.city || a.name} (${a.code})`} onPress={() => flyBackFrom(a.code)} />
+        ))}
+        <Chip theme={t} on={finding} label={finding ? 'Close' : 'Other airport…'} onPress={() => setFinding(!finding)} />
+      </View>
+      {finding && (
+        <View style={[styles.finder, { backgroundColor: t.panel, borderColor: t.border }]}>
+          <TextInput
+            value={typed}
+            onChangeText={setTyped}
+            placeholder="City, airport name or code"
+            placeholderTextColor={t.muted}
+            autoCorrect={false}
+            autoFocus
+            style={[styles.input, { backgroundColor: t.chip, borderColor: t.border, color: t.text }]}
+          />
+          {matches.map((a) => (
+            <Pressable key={a.code} onPress={() => flyBackFrom(a.code)} accessibilityRole="button" style={[styles.match, { borderColor: t.border }]}>
+              <Text style={[styles.dateText, { color: t.text }]} numberOfLines={1}>{a.city || a.name} ({a.code})</Text>
+              <Text style={[styles.small, { color: t.muted }]} numberOfLines={1}>{a.name}</Text>
+            </Pressable>
+          ))}
+          {typed.trim().length >= 2 && matches.length === 0 && <Text style={[styles.small, { color: t.muted }]}>No airport matches.</Text>}
+        </View>
+      )}
+      <Text style={[styles.small, { color: t.muted }]}>
+        {back === code
+          ? 'Pick another airport to arrive here and fly home from there. That checks the dates again (about 3 searches).'
+          : `Arriving at ${airportLabel(code)}, flying home from ${airportLabel(back)}. Getting between them is up to you.`}
+      </Text>
+
       {/* Comparison between the dates: tap one to see its flights */}
       <Text style={[styles.section, { color: t.text }]}>Dates compared</Text>
       <View style={[styles.table, { borderColor: t.border, backgroundColor: t.panel }]}>
         {pairs.map((p) => {
-          const k = keyOf(p);
+          const k = keyOf(back, p);
           const o = outbound[k] ?? WAITING;
           const c = compare(o.list);
           const on = k === open;
           return (
             <Pressable
               key={k}
-              onPress={() => setOpen(k)}
+              onPress={() => setOpenPair(p)}
               accessibilityRole="button"
               accessibilityState={{ selected: on }}
               style={[styles.dateRow, { borderColor: t.border, backgroundColor: on ? t.chip : 'transparent' }]}
@@ -149,22 +221,22 @@ export default function DestinationScreen() {
         })}
       </View>
       <Text style={[styles.small, { color: t.muted }]}>
-        Prices are round trip, as Google shows them for {travelersText(search.adults)}.
+        Prices are for the whole trip there and back, as Google shows them for {travelersText(search.adults)}.
         {search.adults > 1 ? ' Whether that is per person or for everyone has not been confirmed yet.' : ''}
       </Text>
 
-      {pairs.filter((p) => keyOf(p) === open).map((p) => {
-        const k = keyOf(p);
+      {pairs.filter((p) => keyOf(back, p) === open).map((p) => {
+        const k = keyOf(back, p);
         const o = outbound[k] ?? WAITING;
         const mine = picked[k];
-        const back = returns[k];
+        const loaded = returns[k];
         const list = showAll[k] ? o.list : o.list.slice(0, SHOWN);
         return (
           <View key={k} style={styles.block}>
             <Text style={[styles.section, { color: t.text }]}>Outbound · {shortDate(p.out)}</Text>
             {o.status !== 'done' && <Text style={[styles.body, { color: t.muted }]}>Checking live prices…</Text>}
             {o.status === 'done' && o.error && conn && (
-              <SmallButton theme={t} label="Try again" onPress={() => check(conn, p)} />
+              <SmallButton theme={t} label="Try again" onPress={() => check(conn, back, p)} />
             )}
             {list.map((it, i) => (
               <Option key={`o${i}`} theme={t} it={it} selected={mine === it} onPress={() => pickOutbound(p, it)} action={mine === it ? 'Selected' : 'See returns'} />
@@ -175,13 +247,15 @@ export default function DestinationScreen() {
 
             {mine && (
               <>
-                <Text style={[styles.section, { color: t.text }]}>Return · {shortDate(p.ret)}</Text>
-                {(!back || back.status !== 'done') && <Text style={[styles.body, { color: t.muted }]}>Loading returns for the selected flight…</Text>}
-                {back?.error && <Text style={[styles.body, { color: t.price }]}>{back.error}</Text>}
-                {back?.status === 'done' && !back.error && back.list.length === 0 && (
+                <Text style={[styles.section, { color: t.text }]}>
+                  Return · {shortDate(p.ret)}{back !== code ? ` · from ${airportLabel(back)}` : ''}
+                </Text>
+                {(!loaded || loaded.status !== 'done') && <Text style={[styles.body, { color: t.muted }]}>Loading returns for the selected flight…</Text>}
+                {loaded?.error && <Text style={[styles.body, { color: t.price }]}>{loaded.error}</Text>}
+                {loaded?.status === 'done' && !loaded.error && loaded.list.length === 0 && (
                   <Text style={[styles.body, { color: t.muted }]}>No return flights found for this outbound flight.</Text>
                 )}
-                {back?.list.map((it, i) => (
+                {loaded?.list.map((it, i) => (
                   <Option key={`r${i}`} theme={t} it={it} selected={false} onPress={() => choose(p, it)} action="Choose" />
                 ))}
               </>
@@ -220,6 +294,19 @@ function Option({ theme: t, it, selected, onPress, action }: { theme: Theme; it:
   );
 }
 
+function Chip({ theme: t, on, label, onPress }: { theme: Theme; on: boolean; label: string; onPress: () => void }) {
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityState={{ selected: on }}
+      style={[styles.chip, { backgroundColor: on ? t.accent : t.chip, borderColor: on ? t.accent : t.border }]}
+    >
+      <Text style={[styles.action, { color: on ? t.buttonText : t.text }]} numberOfLines={1}>{label}</Text>
+    </Pressable>
+  );
+}
+
 function SmallButton({ theme: t, label, onPress }: { theme: Theme; label: string; onPress: () => void }) {
   return (
     <Pressable onPress={onPress} accessibilityRole="button" style={[styles.smallButton, { backgroundColor: t.chip, borderColor: t.border }]}>
@@ -244,5 +331,10 @@ const styles = StyleSheet.create({
   times: { fontFamily: FONTS.bodyBold, fontSize: 16 },
   right: { alignItems: 'flex-end', gap: 4 },
   action: { fontFamily: FONTS.bodyMedium, fontSize: 13 },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  chip: { borderWidth: 1, borderRadius: 22, paddingHorizontal: 14, height: TOUCH, alignItems: 'center', justifyContent: 'center', maxWidth: '100%' },
+  finder: { borderWidth: 1, borderRadius: 14, padding: 10, gap: 6 },
+  input: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, minHeight: TOUCH + 4, fontFamily: FONTS.body, fontSize: 15 },
+  match: { minHeight: TOUCH + 4, justifyContent: 'center', borderTopWidth: StyleSheet.hairlineWidth, paddingVertical: 4 },
   smallButton: { alignSelf: 'flex-start', borderWidth: 1, borderRadius: 22, paddingHorizontal: 14, height: TOUCH, alignItems: 'center', justifyContent: 'center' },
 });

@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
-  airlinesText, arrivalDayShift, buildTrip, clock, compare, datePairs, decodePairs, durationText, encodePairs,
-  routeText, sanitizeTrip, stopsLine, suggestedPairs,
+  airlinesText, arrivalDayShift, buildTrip, clock, compare, datePairs, decodePairs, distanceKm, durationText, encodePairs,
+  findAirports, nearest, routeText, sanitizeTrip, stopsLine, suggestedPairs,
 } from '../src/flights/flights';
+import { airportByCode, AIRPORTS, airportsIn } from '../src/map/mapData';
 import { fitsWindow } from '../shared/dates';
 import { normalizeExplore, normalizeFlights, normalizeTravelpayouts } from '../shared/normalize';
 import exploreRaw from './fixtures/explore.json';
@@ -71,15 +72,47 @@ describe('describing flights', () => {
 
 describe('the chosen trip', () => {
   it('takes the price from the return option, else from the outbound one', () => {
-    expect(buildTrip('TLV', 'ATH', 2, direct, { ...viaLarnaca, price: 301 })).toMatchObject({ origin: 'TLV', destination: 'ATH', adults: 2, price: 301 });
-    expect(buildTrip('TLV', 'ATH', 1, direct, { ...viaLarnaca, price: null }).price).toBe(142);
+    expect(buildTrip('TLV', 'ATH', 'ATH', 2, direct, { ...viaLarnaca, price: 301 })).toMatchObject({ origin: 'TLV', destination: 'ATH', returnFrom: 'ATH', adults: 2, price: 301 });
+    expect(buildTrip('TLV', 'ATH', 'SKG', 1, direct, { ...viaLarnaca, price: null })).toMatchObject({ returnFrom: 'SKG', price: 142 });
   });
 
   it('reads a saved trip back, or nothing if it is damaged', () => {
-    const trip = buildTrip('TLV', 'ATH', 1, direct, viaLarnaca);
+    const trip = buildTrip('TLV', 'ATH', 'SKG', 1, direct, viaLarnaca);
     expect(sanitizeTrip(JSON.parse(JSON.stringify(trip)))).toEqual(trip);
+    // A trip saved before "fly back from" existed returns from where it arrived
+    const { returnFrom: _old, ...older } = trip;
+    expect(sanitizeTrip(older)?.returnFrom).toBe('ATH');
     expect(sanitizeTrip(null)).toBeNull();
     expect(sanitizeTrip({ origin: 'TLV' })).toBeNull();
     expect(sanitizeTrip({ ...trip, outbound: { legs: [] } })).toBeNull();
+  });
+});
+
+describe('choosing where to fly back from', () => {
+  const ath = airportByCode('ATH')!;
+
+  it('measures distance over the globe', () => {
+    const skg = airportByCode('SKG')!;
+    expect(distanceKm(ath, skg)).toBeGreaterThan(280);
+    expect(distanceKm(ath, skg)).toBeLessThan(320);
+    expect(distanceKm(ath, ath)).toBe(0);
+  });
+
+  it('offers the nearest of the selected airports first, never the arrival airport itself', () => {
+    const picks = nearest(ath, [...airportsIn('GR'), ...airportsIn('IT')], 4);
+    expect(picks).toHaveLength(4);
+    expect(picks.map((a) => a.code)).not.toContain('ATH');
+    expect(picks.every((a) => a.cc === 'GR')).toBe(true);
+    const d = picks.map((a) => distanceKm(ath, a));
+    expect([...d].sort((x, y) => x - y)).toEqual(d);
+  });
+
+  it('finds an airport by code, city or name', () => {
+    expect(findAirports('skg', AIRPORTS)[0].code).toBe('SKG');
+    expect(findAirports('Sof', AIRPORTS).map((a) => a.code)).toContain('SOF');
+    expect(findAirports('thessal', AIRPORTS).map((a) => a.code)).toContain('SKG');
+    expect(findAirports('s', AIRPORTS)).toEqual([]);
+    expect(findAirports('zzzzzz', AIRPORTS)).toEqual([]);
+    expect(findAirports('lon', AIRPORTS, 5).length).toBeLessThanOrEqual(5);
   });
 });

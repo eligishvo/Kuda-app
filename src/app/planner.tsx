@@ -30,9 +30,13 @@ export default function Planner() {
       )}
       {trip && (
         <>
-          <Text style={[styles.heading, { color: t.text }]}>{airportLabel(trip.origin)} ⇄ {airportLabel(trip.destination)}</Text>
+          <Text style={[styles.heading, { color: t.text }]}>
+            {trip.returnFrom === trip.destination
+              ? `${airportLabel(trip.origin)} ⇄ ${airportLabel(trip.destination)}`
+              : `${airportLabel(trip.origin)} → ${airportLabel(trip.destination)}, back from ${airportLabel(trip.returnFrom)}`}
+          </Text>
           <Text style={[styles.body, { color: t.muted }]}>
-            {travelersText(trip.adults)} · round trip{' '}
+            {travelersText(trip.adults)} · there and back{' '}
             <Text style={{ color: t.price, fontFamily: FONTS.bodyBold }}>{trip.price != null ? `$${trip.price}` : 'price not shown'}</Text>
           </Text>
           <Flight theme={t} label="Outbound" it={trip.outbound} />

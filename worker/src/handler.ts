@@ -167,8 +167,23 @@ export async function handle(request: Request, env: Env, deps: Deps = REAL): Pro
       if (!iata(dest)) throw new Problem('dest must be a 3-letter airport code.', 400);
       if (!isDate(out) || !isDate(ret) || ret < out) throw new Problem('out and ret must be dates like 2026-12-07, with ret on or after out.', 400);
       if (adults == null) throw new Problem('adults must be 1–9.', 400);
-      const params: Record<string, string> = { engine: 'google_flights', type: '1', departure_id: origin, arrival_id: dest, outbound_date: out, return_date: ret, adults: String(adults) };
-      const base = `${origin}:${dest}:${out}:${ret}:${adults}`;
+      // "back" is the airport to fly home from. When it differs from the arrival airport the trip is an
+      // "open jaw", which Google handles as a two-leg multi-city search: there, then home from the other airport.
+      const back = q.get('back') ?? '';
+      if (back && !iata(back)) throw new Problem('back must be a 3-letter airport code.', 400);
+      const openJaw = back !== '' && back !== dest;
+      const params: Record<string, string> = openJaw
+        ? {
+            engine: 'google_flights',
+            type: '3',
+            multi_city_json: JSON.stringify([
+              { departure_id: origin, arrival_id: dest, date: out },
+              { departure_id: back, arrival_id: origin, date: ret },
+            ]),
+            adults: String(adults),
+          }
+        : { engine: 'google_flights', type: '1', departure_id: origin, arrival_id: dest, outbound_date: out, return_date: ret, adults: String(adults) };
+      const base = `${origin}:${dest}:${out}:${ret}:${adults}${openJaw ? `:${back}` : ''}`;
       if (url.pathname === '/flights') {
         return await cached(env, deps, `flights:${base}`, TTL.flights, async () => {
           const data = normalizeFlights(await serpapi(env, deps, params));

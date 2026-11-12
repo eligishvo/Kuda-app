@@ -12,7 +12,7 @@ import { flyTo, useMapView } from '../map/useMapView';
 import { datePairs, encodePairs, suggestedPairs } from '../flights/flights';
 import { priceText, Result, windowOf } from '../results/results';
 import { useResults } from '../results/useResults';
-import { nightsText, shortDate } from '../search/search';
+import { nightsText, shortDate, travelersText } from '../search/search';
 import { useSearch } from '../search/SearchContext';
 import {
   chips, countryState, EMPTY, isAirportSelected, removeCountry, selectAll, selectedAirports, toggleAirport, toggleCountry,
@@ -152,7 +152,7 @@ export default function Home() {
               {shortDate(search.earliestOut)} – {shortDate(search.latestRet)} · {nightsText(search)}
             </Text>
             <Text style={[styles.tripSub, { color: t.muted }]} numberOfLines={1}>
-              {search.adults} {search.adults === 1 ? 'traveler' : 'travelers'} · up to <Text style={{ color: t.price }}>${search.budget}</Text> each
+              {travelersText(search.adults)} · up to <Text style={{ color: t.price }}>${search.budget}</Text> each
             </Text>
           </Pressable>
         </View>
