@@ -1,7 +1,7 @@
 // Small wrapper around the phone's key-value storage: values are saved as JSON and reads never throw.
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-export const KEYS = { theme: 'kuda.theme', selection: 'kuda.selection', connection: 'kuda.connection', search: 'kuda.search' };
+export const KEYS = { theme: 'kuda.theme', selection: 'kuda.selection', connection: 'kuda.connection', search: 'kuda.search', trip: 'kuda.trip' };
 
 export async function load<T>(key: string, fallback: T): Promise<T> {
   try {

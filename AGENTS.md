@@ -34,7 +34,7 @@ the same code as the app: the quickest way to look at a map change without a pho
 
 | Path | What |
 |---|---|
-| `src/app/` | Screens (Expo Router): `index.tsx` map + selection sheet, `search.tsx` trip details, `settings.tsx`, `debug.tsx`, `_layout.tsx` |
+| `src/app/` | Screens (Expo Router): `index.tsx` map + selection sheet, `search.tsx` trip details, `destination.tsx` live flights, `planner.tsx` placeholder, `settings.tsx`, `debug.tsx`, `_layout.tsx` |
 | `src/map/projection.ts` | The globe-to-flat projection maths (worklets; unit tested) |
 | `src/map/draw.ts` | Turns countries, graticule and airports into paths for one frame (worklets) |
 | `src/map/GlobeMap.tsx` | Skia canvas + drag / pinch / tap gestures |
@@ -43,6 +43,7 @@ the same code as the app: the quickest way to look at a map change without a pho
 | `src/selection/` | Selected countries / airports (pure functions + a hook that saves them) |
 | `src/results/` | Price search: which Worker calls to make, and turning their answers into results (rules + hook) |
 | `src/map/pins.ts`, `PricePins.tsx`, `useMapView.ts` | Price labels on the map; the shared "where the map is looking" values |
+| `src/flights/flights.ts` | Destination screen rules: which dates to check live, describing and comparing flights, the chosen trip |
 | `src/search/` | The trip being searched: departure, dates, trip length, travelers, budget (rules + shared state) |
 | `src/ui/` | Shared pieces: selection sheet, results sheet, calendar, stepper |
 | `src/theme/` | The three themes as token objects, and the theme provider |

@@ -9,7 +9,8 @@ import { Hit } from '../map/hitTest';
 import { airportByCode, airportCodesIn, airportLabel, AIRPORTS, airportsIn, countryName, GEO_HIGH, GEO_LOW } from '../map/mapData';
 import { Pin } from '../map/pins';
 import { flyTo, useMapView } from '../map/useMapView';
-import { priceText, Result } from '../results/results';
+import { datePairs, encodePairs, suggestedPairs } from '../flights/flights';
+import { priceText, Result, windowOf } from '../results/results';
 import { useResults } from '../results/useResults';
 import { nightsText, shortDate } from '../search/search';
 import { useSearch } from '../search/SearchContext';
@@ -115,6 +116,13 @@ export default function Home() {
     flyTo(view, r.lon, r.lat);
   };
 
+  const openDestination = (r: Result) => {
+    // Check the dates the price lists suggest for this airport first, then others across the window
+    const w = windowOf(search);
+    const pairs = datePairs(w, suggestedPairs(r.airport, found.lists, w));
+    router.push({ pathname: '/destination', params: { code: r.airport, pairs: encodePairs(pairs) } });
+  };
+
   return (
     <View style={[styles.fill, { backgroundColor: t.background }]}>
       <GlobeMap
@@ -168,6 +176,7 @@ export default function Home() {
           budget={search.budget}
           focused={focused}
           onPick={pickResult}
+          onOpen={openDestination}
           onEdit={() => setShowResults(false)}
           onRefresh={found.run}
         />

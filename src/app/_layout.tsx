@@ -27,6 +27,8 @@ function Screens() {
       >
         <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="search" options={{ title: 'Trip details' }} />
+        <Stack.Screen name="destination" options={{ title: 'Flights' }} />
+        <Stack.Screen name="planner" options={{ title: 'Planner' }} />
         <Stack.Screen name="settings" options={{ title: 'Settings' }} />
         <Stack.Screen name="debug" options={{ title: 'Flight data (debug)' }} />
       </Stack>

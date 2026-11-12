@@ -23,6 +23,8 @@ export type ResultsState = {
   results: Results | null;
   /** True when the dates, trip length or departure changed since these prices were fetched. */
   stale: boolean;
+  /** Every price list that was fetched (Google's first), for suggesting dates to check live. */
+  lists: Destination[][];
   run: () => void;
   clear: () => void;
 };
@@ -91,5 +93,7 @@ export function useResults(search: Search, selected: string[]): ResultsState {
 
   const stale = raw != null && raw.key !== callsKey(search);
 
-  return { status, progress, error, usage, results, stale, run, clear };
+  const lists = useMemo(() => (raw ? [...raw.explore, ...raw.estimates] : []), [raw]);
+
+  return { status, progress, error, usage, results, stale, lists, run, clear };
 }

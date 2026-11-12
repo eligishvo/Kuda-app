@@ -5,9 +5,10 @@ Spec: `docs/BRIEF.md`. Rules: `AGENTS.md`.
 
 ## Status (2026-11-12)
 
-**Phases 1, 2 and 2b are built.** Phases 1 and 2 were run by the owner on his phone in Expo Go and against the
-deployed Worker with real keys on 2026-11-12: the globe, selection, themes, settings and every debug-screen call
-worked. Phase 2b (search setup) passes the checks but has not been tried on the phone yet.
+**All phases of the brief are written (1, 2, 2b, 3, 4 and 5), except the Android preview build and the first
+Expo update, which wait for the owner's go-ahead.** Phases 1 and 2 were run by the owner on his phone in Expo Go
+and against the deployed Worker with real keys on 2026-11-12 and worked. Phases 2b, 3, 4 and 5 pass the checks
+(typecheck, 105 tests, Android bundle) but have **not been tried on the phone yet**.
 
 Built in phase 1:
 - Expo SDK 58 project (`kuda`, owner `elidesigninc`), Expo Router, TypeScript, vitest, same versions as Mechanoplanner.
@@ -59,6 +60,18 @@ Built in phase 3:
 - Airports are written with their city everywhere: "Sofia (SOF)" in chips, the trip summary and results; lists
   also show the full airport name.
 
+Built in phases 4 and 5:
+- Destination screen (`src/app/destination.tsx`, rules in `src/flights/flights.ts`): opened from a result's
+  "Compare flights" / "Check flights" button. Checks up to three date pairs live, one after the other: the dates
+  the price lists suggest for that airport first, then trips spread across the window. Shows a comparison of the
+  dates (cheapest price, fastest time, stops), the outbound options of the open date, and, after tapping an
+  outbound flight, its return options (loaded on demand: one more search).
+- Choosing a return saves a typed `TripSelection` (`KEYS.trip`) and opens the placeholder Planner
+  (`src/app/planner.tsx`), which shows the route, both flights leg by leg and the price. Also reachable from
+  Settings → Chosen flights (planner).
+- High Command registration and the problem-report button were done in phase 1.
+- Not done: the Android preview build (`[build]`) and publishing the Expo update.
+
 ## How to test on a phone
 
 1. In the repo folder: `git pull`, `npm install`, `npx expo start`.
@@ -76,6 +89,13 @@ Built in phase 3:
    same button should say "from cache (free)"). "Explore Greece" checks the country search.
 4. Tap "Flights ×2 adults" and compare its prices with "Flights": that answers the open question below.
 
+## How to test phases 4 and 5
+
+After a search, tap a result row, then "Compare flights". Three date rows fill in one after the other (about 3
+searches). Tap a date row to see its outbound flights; tap one ("See returns", 1 search); tap a return
+("Choose"): the Planner opens with both flights. Go back to the map, open Settings → Chosen flights: the same
+trip is there. For a "no estimate" airport the button says "Check flights".
+
 ## How to test phase 3
 
 Needs the Worker address and token saved on the debug screen. Select Greece and Italy, tap "Search flights":
@@ -92,14 +112,17 @@ rings on the map should follow. Close and reopen the app: the search should stil
 
 ## Next
 
-1. Phase 3: results. Price pins on the globe and a ranked list, filtered by the search's budget and date window
-   (`fitsWindow`, `monthsInWindow`, `durationBucket` in `shared/dates.ts` are ready for this). See the brief.
-2. Publish: every commit so far carries `[skip ci]`, so no Expo update or Android build has been made. The owner
-   hasn't said whether to publish yet; ask before the first push without `[skip ci]`.
+1. The owner tests phases 2b to 5 on the phone; fix what turns up.
+2. Publish: every commit so far carries `[skip ci]`, so no Expo update or Android build exists. When the owner
+   says go, push a commit without `[skip ci]` and with `[build]` (needs the `EXPO_TOKEN` secret, which is set).
+3. Answer the per-person price question (below) and then show totals for more than one traveler.
+4. Later ideas, only if the owner asks: robots for High Command's Bots tab; the real trip planner.
 
 ## Not verified
 
 - Phase 2b on a phone (calendar taps, the country list, the summary pill's size on a small screen).
+- Phases 4 and 5 on a phone and against real answers: the destination screen's sequence of live checks, the
+  returns list (real `departure_token`s are long; they travel in the address of the Worker call), the Planner.
 - Phase 3 on a phone: pins following the map, pin taps, the results list, and how many Google results actually
   fit a real date window (Google picks the dates; a narrow window may leave most airports with "no estimate").
 - Speed on other phones: the globe was smooth enough on the owner's phone that he reported no problem, but no
@@ -125,7 +148,11 @@ rings on the map should follow. Close and reopen the app: the search should stil
 - **Country searches** (`arrival_area_id`) are not used: they need Google's id for each country and failed for
   some in the brief's tests. Results come from the "anywhere" call filtered to the selection, as the brief allows.
 - **While results show, map taps don't change the destinations** (only pins respond); "Destinations" goes back.
-- **"No estimate — tap to check"** pins and rows exist, but the check itself is phase 4 (live flight search).
+- **"No estimate — tap to check":** a pin tap highlights the row; the row's "Check flights" button opens the
+  destination screen, which runs the live checks.
+- **Opening a destination spends up to 3 searches without asking** (as the brief describes); the screen shows
+  how many are left. Returns are loaded only when an outbound flight is tapped.
+- **Live checks use the first departure airport and the search's number of travelers.**
 - **Calendar:** written in the app (`src/ui/Calendar.tsx`) instead of adding a date-picker library, so it follows
   the themes and needs no native code. Weeks start on Sunday.
 - **App token:** typed into the debug screen and kept on the phone, not stored in `app.json`, so it never reaches
@@ -155,6 +182,9 @@ None recorded yet (nothing has run on a phone).
 
 ## Changelog
 
+- **2026-11-12** — Phases 4 and 5: destination screen with live date checks, outbound and return lists and a
+  date comparison; chosen flights saved as `TripSelection` and shown on a placeholder Planner. 105 tests passing.
+  Not yet on a phone; no build or update published.
 - **2026-11-12** — Phase 3: price search plan and results rules, price pins, results sheet, "Search flights".
   Airports shown as "City (CODE)" with full names in lists (owner's request). 95 tests passing. Not yet on a phone.
 - **2026-11-12** — Phase 2b: search rules and saved state, Trip details screen, calendar, steppers, summary on

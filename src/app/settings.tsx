@@ -40,6 +40,16 @@ export default function Settings() {
       <Text style={[styles.heading, { color: t.text }]}>Report a problem</Text>
       <ReportForm theme={t} />
 
+      <Text style={[styles.heading, { color: t.text }]}>Trip</Text>
+      <Pressable
+        onPress={() => router.push('/planner')}
+        accessibilityRole="button"
+        style={[styles.link, { backgroundColor: t.chip, borderColor: t.border }]}
+      >
+        <Text style={[styles.linkText, { color: t.text }]}>Chosen flights (planner)</Text>
+        <Text style={[styles.linkText, { color: t.muted }]}>›</Text>
+      </Pressable>
+
       <Text style={[styles.heading, { color: t.text }]}>Developer</Text>
       <Pressable
         onPress={() => router.push('/debug')}

@@ -18,6 +18,8 @@ type Props = {
   /** The airport whose pin or row was tapped last. */
   focused: string | null;
   onPick: (r: Result) => void;
+  /** Open the destination screen (live flight checks) for a result. */
+  onOpen: (r: Result) => void;
   /** Back to choosing destinations. */
   onEdit: () => void;
   onRefresh: () => void;
@@ -30,7 +32,7 @@ const KIND_NOTE: Record<Result['kind'], string> = {
   none: 'No estimate for your dates',
 };
 
-export function ResultsSheet({ theme: t, results, loading, progress, error, usage, budget, focused, onPick, onEdit, onRefresh }: Props) {
+export function ResultsSheet({ theme: t, results, loading, progress, error, usage, budget, focused, onPick, onOpen, onEdit, onRefresh }: Props) {
   const insets = useSafeAreaInsets();
   const list = results?.list ?? [];
   const priced = list.filter((r) => r.estimate).length;
@@ -57,6 +59,9 @@ export function ResultsSheet({ theme: t, results, loading, progress, error, usag
       {!loading && results && list.length === 0 && !error && (
         <Text style={[styles.note, { color: t.muted }]}>Nothing fits these dates and budget. Try a wider window or a higher budget.</Text>
       )}
+      {!loading && list.length > 0 && (
+        <Text style={[styles.note, { color: t.muted }]}>Tap a destination, then "Compare flights" for live times and prices (uses about 3 searches).</Text>
+      )}
       <ScrollView style={styles.list}>
         {list.map((r) => {
           const e = r.estimate;
@@ -77,9 +82,21 @@ export function ResultsSheet({ theme: t, results, loading, progress, error, usag
                     : KIND_NOTE.none}
                 </Text>
               </View>
-              <Text style={[e ? styles.price : styles.noPrice, { color: e ? t.price : t.muted, opacity: r.kind === 'rough' ? 0.8 : 1 }]}>
-                {priceText(r)}
-              </Text>
+              <View style={styles.right}>
+                {e && (
+                  <Text style={[styles.price, { color: t.price, opacity: r.kind === 'rough' ? 0.8 : 1 }]}>{priceText(r)}</Text>
+                )}
+                {/* The tapped row offers the live flight check */}
+                {on && (
+                  <Pressable
+                    onPress={() => onOpen(r)}
+                    accessibilityRole="button"
+                    style={[styles.open, { backgroundColor: t.accent }]}
+                  >
+                    <Text style={[styles.openText, { color: t.buttonText }]}>{e ? 'Compare flights' : 'Check flights'}</Text>
+                  </Pressable>
+                )}
+              </View>
             </Pressable>
           );
         })}
@@ -119,5 +136,7 @@ const styles = StyleSheet.create({
   city: { fontFamily: FONTS.bodyBold, fontSize: 15 },
   detail: { fontFamily: FONTS.body, fontSize: 12, lineHeight: 17 },
   price: { fontFamily: FONTS.heading, fontSize: 18 },
-  noPrice: { fontFamily: FONTS.body, fontSize: 12 },
+  right: { alignItems: 'flex-end', gap: 4 },
+  open: { borderRadius: 22, paddingHorizontal: 14, height: TOUCH, alignItems: 'center', justifyContent: 'center' },
+  openText: { fontFamily: FONTS.bodyBold, fontSize: 13 },
 });
