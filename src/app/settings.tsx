@@ -2,16 +2,13 @@
 import Constants from 'expo-constants';
 import { router } from 'expo-router';
 import * as Updates from 'expo-updates';
-import { useState } from 'react';
-import { Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { buildReport, checkReport, LIMITS, REPORT_PRIVACY, sendReport } from '../report/report';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LIMITS as TRIP_LIMITS } from '../search/search';
 import { useSearch } from '../search/SearchContext';
 import { useSetTheme, useTheme } from '../theme/ThemeContext';
 import { FONTS, Theme, THEME_IDS, THEMES, TOUCH } from '../theme/themes';
 import { Stepper } from '../ui/Stepper';
 
-const RELAY: string = Constants.expoConfig?.extra?.highCommand?.reportUrl ?? '';
 const VERSION = Constants.expoConfig?.version ?? '?';
 
 export default function Settings() {
@@ -42,7 +39,15 @@ export default function Settings() {
       </View>
 
       <Text style={[styles.heading, { color: t.text }]}>Report a problem</Text>
-      <ReportForm theme={t} />
+      <Pressable
+        onPress={() => router.push({ pathname: '/report', params: { from: '/settings' } })}
+        accessibilityRole="button"
+        style={[styles.link, { backgroundColor: t.chip, borderColor: t.border }]}
+      >
+        <Text style={[styles.linkText, { color: t.text }]}>Send a report to High Command</Text>
+        <Text style={[styles.linkText, { color: t.muted }]}>›</Text>
+      </Pressable>
+      <Text style={[styles.small, { color: t.muted }]}>The "!" button at the top of every screen does the same.</Text>
 
       <Text style={[styles.heading, { color: t.text }]}>Trip</Text>
       {/* The same number as in Trip details: prices are checked for this many adults */}
@@ -85,80 +90,6 @@ function Swatch({ theme: o }: { theme: Theme }) {
       <View style={[styles.swatchLand, { backgroundColor: o.land }]} />
       <View style={[styles.swatchSelected, { backgroundColor: o.selectedFill }]} />
       <View style={[styles.swatchDot, { backgroundColor: o.accent }]} />
-    </View>
-  );
-}
-
-function ReportForm({ theme: t }: { theme: Theme }) {
-  const [title, setTitle] = useState('');
-  const [details, setDetails] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
-
-  if (!RELAY) return <Text style={[styles.body, { color: t.muted }]}>Reporting isn't set up in this build.</Text>;
-
-  const send = async () => {
-    const problem = checkReport({ title, details });
-    if (problem) {
-      setMessage({ ok: false, text: problem });
-      return;
-    }
-    setBusy(true);
-    setMessage(null);
-    const result = await sendReport(
-      RELAY,
-      buildReport(
-        { title, details },
-        {
-          screen: '/settings',
-          where: 'Settings',
-          steps: ['⚙ (top right of the map)'],
-          version: VERSION,
-          updateId: Updates.updateId,
-          platform: Platform.OS,
-        },
-      ),
-    );
-    setBusy(false);
-    if (result.ok) {
-      setTitle('');
-      setDetails('');
-      setMessage({ ok: true, text: result.ticket ? `Sent. Ticket #${result.ticket}.` : 'Sent. Thank you.' });
-    } else {
-      setMessage({ ok: false, text: result.error });
-    }
-  };
-
-  const input = [styles.input, { backgroundColor: t.chip, borderColor: t.border, color: t.text }];
-  return (
-    <View style={styles.form}>
-      <TextInput
-        value={title}
-        onChangeText={setTitle}
-        placeholder="What went wrong? (short title)"
-        placeholderTextColor={t.muted}
-        maxLength={LIMITS.title}
-        style={input}
-      />
-      <TextInput
-        value={details}
-        onChangeText={setDetails}
-        placeholder="Details: what you did, what you expected (optional)"
-        placeholderTextColor={t.muted}
-        maxLength={LIMITS.details}
-        multiline
-        style={[input, styles.details]}
-      />
-      <Pressable
-        onPress={send}
-        disabled={busy}
-        accessibilityRole="button"
-        style={[styles.send, { backgroundColor: t.accent, opacity: busy ? 0.6 : 1 }]}
-      >
-        <Text style={[styles.sendText, { color: t.buttonText }]}>{busy ? 'Sending…' : 'Send report'}</Text>
-      </Pressable>
-      {message && <Text style={[styles.body, { color: message.ok ? t.text : t.price }]}>{message.text}</Text>}
-      <Text style={[styles.small, { color: t.muted }]}>{REPORT_PRIVACY}</Text>
     </View>
   );
 }

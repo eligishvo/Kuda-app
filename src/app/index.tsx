@@ -10,6 +10,7 @@ import { airportByCode, airportCodesIn, airportLabel, AIRPORTS, airportsIn, coun
 import { Pin } from '../map/pins';
 import { flyTo, useMapView } from '../map/useMapView';
 import { datePairs, encodePairs, suggestedPairs } from '../flights/flights';
+import { ReportButton } from '../report/ReportButton';
 import { priceText, Result, windowOf } from '../results/results';
 import { useResults } from '../results/useResults';
 import { nightsText, shortDate, travelersText } from '../search/search';
@@ -32,6 +33,8 @@ export default function Home() {
   const homeCc = search.departureCc;
   /** The country whose airports are listed in the sheet, if any. */
   const [narrowCc, setNarrowCc] = useState<string | null>(null);
+  /** The airport tapped on the map, shown with its name before it is added or removed. */
+  const [previewCode, setPreviewCode] = useState<string | null>(null);
   /** Which bottom panel is showing. */
   const [showResults, setShowResults] = useState(false);
   /** The airport whose pin or result row was tapped last. */
@@ -73,8 +76,8 @@ export default function Home() {
 
   // Airports whose city name always shows on the map: the ones you fly from, the selected ones, the priced ones
   const named = useMemo(
-    () => new Set([...search.departureAirports, ...selectedAirports(selection, airportCodesIn), ...pins.map((p) => p.code)]),
-    [search.departureAirports, selection, pins],
+    () => new Set([...search.departureAirports, ...selectedAirports(selection, airportCodesIn), ...pins.map((p) => p.code), ...(previewCode ? [previewCode] : [])]),
+    [search.departureAirports, selection, pins, previewCode],
   );
   // Roughly how much of the screen the top bar and the bottom panel cover
   const covered = useMemo(() => ({ top: insets.top + 130, bottom: insets.bottom + (showResults ? 330 : 190) }), [insets.top, insets.bottom, showResults]);
@@ -84,6 +87,7 @@ export default function Home() {
       if (!hit) {
         setNarrowCc(null);
         setFocused(null);
+        setPreviewCode(null);
         return;
       }
       if (hit.kind === 'pin') {
@@ -95,9 +99,12 @@ export default function Home() {
       // The departure country isn't a destination
       if (hit.cc === homeCc) return;
       if (hit.kind === 'airport') {
-        update((s) => toggleAirport(s, hit.cc, hit.code, airportCodesIn(hit.cc)));
+        // Show which airport this is first; the card's button adds or removes it
+        setNarrowCc(null);
+        setPreviewCode(hit.code);
         return;
       }
+      setPreviewCode(null);
       // On the flat map, tapping a selected country opens its airports instead of clearing it
       if (flat && countryState(selection, hit.cc) !== 0 && airportsIn(hit.cc).length > 0) {
         setNarrowCc(hit.cc);
@@ -111,6 +118,8 @@ export default function Home() {
 
   const chipList = useMemo(() => chips(selection, countryName, airportCodesIn, airportLabel), [selection]);
   const narrowing = narrowCc != null && selection[narrowCc] ? narrowCc : null;
+
+  const previewAirport = previewCode ? airportByCode(previewCode) : undefined;
 
   const pickResult = (r: Result) => {
     setFocused(r.airport);
@@ -168,6 +177,10 @@ export default function Home() {
           <Text style={[styles.settingsIcon, { color: t.text }]}>⚙</Text>
         </Pressable>
       </View>
+      {/* Report a problem to High Command, under the settings button */}
+      <View style={[styles.report, { top: insets.top + 8 + TOUCH + 8 }]}>
+        <ReportButton round />
+      </View>
       {showResults ? (
         <ResultsSheet
           theme={t}
@@ -198,6 +211,17 @@ export default function Home() {
             note: found.results && !found.stale ? undefined : chipList.length === 0 ? 'Nothing picked: the search will look everywhere.' : undefined,
             second: found.results && !found.stale ? { label: 'Prices on map', onPress: () => { setNarrowCc(null); setShowResults(true); } } : undefined,
           }}
+          preview={
+            previewAirport && !narrowing
+              ? {
+                  airport: previewAirport,
+                  country: countryName(previewAirport.cc),
+                  selected: isAirportSelected(selection, previewAirport.cc, previewAirport.code),
+                  onToggle: () => update((s) => toggleAirport(s, previewAirport.cc, previewAirport.code, airportCodesIn(previewAirport.cc))),
+                  onClose: () => setPreviewCode(null),
+                }
+              : undefined
+          }
           narrow={
             narrowing
               ? {
@@ -231,4 +255,5 @@ const styles = StyleSheet.create({
   tripSub: { fontFamily: FONTS.body, fontSize: 12, marginTop: 1 },
   settings: { width: TOUCH, height: TOUCH, borderRadius: TOUCH / 2, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   settingsIcon: { fontSize: 20 },
+  report: { position: 'absolute', right: 16 },
 });

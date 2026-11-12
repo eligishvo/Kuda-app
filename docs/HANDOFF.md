@@ -107,6 +107,14 @@ Added 2026-11-12, second round (owner's requests):
   times; selection and results are shared between screens through `SelectionProvider` and `ResultsProvider`.
 - Wording: trip length is in **days** on screen (the code still says nights: return date minus leave date).
 
+Added 2026-11-12, third round (owner's feedback after using the app: "it seems to work"):
+- **Airport card before selecting:** on the flat map, tapping an airport dot no longer toggles it. A card in the
+  bottom panel shows "City (CODE)", the full airport name and the country, with Add / Remove. The tapped airport
+  also gets its name on the map. Zoomed in past 6×, up to 80 airports are named (was 44).
+- **Report button:** a "!" button in every screen's header and floating on the map (under the gear) opens a
+  separate Report screen (`src/app/report.tsx`). The ticket records which screen it was pressed on
+  (`whereOf` in `src/report/report.ts`). Settings links to the same screen instead of holding the form.
+
 ## How to test on a phone
 
 1. In the repo folder: `git pull`, `npm install`, `npx expo start`.
@@ -203,6 +211,11 @@ rings on the map should follow. Close and reopen the app: the search should stil
 - **Is Google's price per person or for everyone (adults > 1)?** Still open: the owner said prices "seem to
   work" but didn't report the two numbers. Compare "Flights" and "Flights ×2 adults" on the debug screen before
   phase 4 shows totals. The app asks Explore and estimates with 1 adult, so those prices are per person.
+- **Third-party sellers (owner asked 2026-11-12):** prices come from Google Flights (which includes online travel
+  agencies among its partners) and from Aviasales' cache (also a metasearch). The app shows one price per
+  flight, not who sells it. SerpApi can list the sellers of a chosen flight (`booking_token` → `booking_options`,
+  one more search); offered to the owner, not built. Kiwi-only self-transfer combinations and Israeli agencies
+  such as Gulliver are not covered unless Google lists them.
 - **OpenFlights city names** are under the Open Database License (attribution, shown in Settings → About;
   share-alike for the derived data file). Fine for a personal app; if the app is ever published commercially,
   review it or swap in another source. Reverting is one line in `scripts/build-map-data.mjs`.
@@ -249,6 +262,8 @@ None recorded yet (nothing has run on a phone).
 
 ## Changelog
 
+- **2026-11-12** — Third round: airport card before selecting, more names when zoomed in, a separate report
+  button on every screen. Owner reported the previous rounds "seem to work". 130 tests. Published as an update.
 - **2026-11-12** — Second round of owner's requests: city names on the map (with served-city names from
   OpenFlights), search form with a Search button and options, results list with dates, times, days, total cost,
   sorting and filters, mixed-airport options from one-way fares (Worker `/oneways`). 129 tests. Published as an

@@ -64,3 +64,18 @@ export async function sendReport(url: string, payload: ReportPayload, fetchFn: t
 /** What a report collects and where it goes (shown under the form). */
 export const REPORT_PRIVACY =
   'Your report is stored in our issue tracker (GitHub) only to fix the problem, together with the app version and the platform (e.g. Android). Nothing else is collected.';
+
+/** A screen's route in plain words, for the ticket ("/results" → "Results list"). */
+export function whereOf(route: string): string {
+  const names: Record<string, string> = {
+    '/': 'Map',
+    '/search': 'Search flights',
+    '/results': 'Results list',
+    '/destination': 'Destination (live flights)',
+    '/planner': 'Planner',
+    '/settings': 'Settings',
+    '/debug': 'Flight data (debug)',
+  };
+  const path = (route.split('?')[0] || '/').replace(/\/+$/, '') || '/';
+  return names[path] ?? path;
+}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildReport, checkReport, sendReport } from '../src/report/report';
+import { buildReport, checkReport, sendReport, whereOf } from '../src/report/report';
 import { THEME_IDS, THEMES } from '../src/theme/themes';
 
 const ctx = { screen: '/settings', where: 'Settings', steps: ['⚙ (top right)'], version: '1.0.0', updateId: null, platform: 'android' };
@@ -32,6 +32,16 @@ describe('problem reports', () => {
     const p = buildReport({ title: 'abc', details: '' }, ctx);
     expect(await sendReport('https://relay.example', p, down)).toMatchObject({ ok: false });
     expect(await sendReport('https://relay.example', p, refuse)).toEqual({ ok: false, error: 'Unknown app' });
+  });
+});
+
+describe('where a report came from', () => {
+  it('names the screen in plain words', () => {
+    expect(whereOf('/')).toBe('Map');
+    expect(whereOf('')).toBe('Map');
+    expect(whereOf('/results')).toBe('Results list');
+    expect(whereOf('/destination?code=ATH')).toBe('Destination (live flights)');
+    expect(whereOf('/something-new')).toBe('/something-new');
   });
 });
 

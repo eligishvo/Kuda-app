@@ -13,6 +13,8 @@ type Props = {
   onClear: () => void;
   /** The main button under the chips (e.g. "Search flights"). */
   action?: { label: string; onPress: () => void; busy?: boolean; note?: string; second?: { label: string; onPress: () => void } };
+  /** The airport that was just tapped on the map: shown with its name so it can be added or removed knowingly. */
+  preview?: { airport: Airport; country: string; selected: boolean; onToggle: () => void; onClose: () => void };
   /** Set while narrowing one country down to some airports. */
   narrow?: {
     cc: string;
@@ -26,7 +28,7 @@ type Props = {
   };
 };
 
-export function SelectionSheet({ theme: t, chips, onRemove, onClear, action, narrow }: Props) {
+export function SelectionSheet({ theme: t, chips, onRemove, onClear, action, preview, narrow }: Props) {
   const insets = useSafeAreaInsets();
   const sheet = [styles.sheet, { backgroundColor: t.panel, borderColor: t.border, paddingBottom: insets.bottom + 12 }];
 
@@ -83,14 +85,36 @@ export function SelectionSheet({ theme: t, chips, onRemove, onClear, action, nar
 
   return (
     <View style={sheet}>
+      {preview && (
+        <View style={[styles.preview, { backgroundColor: t.chip, borderColor: t.border }]}>
+          <View style={styles.previewText}>
+            <Text style={[styles.previewCity, { color: t.text }]} numberOfLines={1}>
+              {preview.airport.city || preview.airport.name} ({preview.airport.code})
+            </Text>
+            <Text style={[styles.airportName, { color: t.muted }]} numberOfLines={2}>
+              {preview.airport.name} · {preview.country}
+            </Text>
+          </View>
+          <Pressable
+            onPress={preview.onToggle}
+            accessibilityRole="button"
+            style={[styles.previewButton, { backgroundColor: preview.selected ? t.panel : t.accent, borderColor: preview.selected ? t.border : t.accent }]}
+          >
+            <Text style={[styles.smallText, { color: preview.selected ? t.text : t.buttonText }]}>{preview.selected ? 'Remove' : 'Add'}</Text>
+          </Pressable>
+          <Pressable onPress={preview.onClose} accessibilityRole="button" accessibilityLabel="Close" hitSlop={8} style={styles.chipRemove}>
+            <Text style={[styles.chipX, { color: t.muted }]}>✕</Text>
+          </Pressable>
+        </View>
+      )}
       <View style={styles.row}>
         <Text style={[styles.title, { color: t.text }]}>Destinations</Text>
         {chips.length > 0 && <SmallButton theme={t} label="Clear" onPress={onClear} />}
       </View>
       {chips.length === 0 ? (
         <Text style={[styles.hint, { color: t.muted }]}>
-          Tap a country to add it. Pinch in to see its airports and pick only some. With nothing picked, the search
-          looks everywhere.
+          Tap a country to add it. Pinch in and tap an airport to see what it is before adding it. With nothing
+          picked, the search looks everywhere.
         </Text>
       ) : (
         <ScrollView style={styles.chipScroll} contentContainerStyle={styles.chips}>
@@ -187,6 +211,10 @@ const styles = StyleSheet.create({
   check: { width: 24, height: 24, borderRadius: 6, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
   checkMark: { fontSize: 14, fontWeight: '700', lineHeight: 18 },
   code: { fontFamily: FONTS.bodyBold, fontSize: 15, width: 44 },
+  preview: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: 14, paddingLeft: 12, paddingVertical: 6, marginBottom: 6 },
+  previewText: { flex: 1 },
+  previewCity: { fontFamily: FONTS.bodyBold, fontSize: 15 },
+  previewButton: { borderWidth: 1, borderRadius: 22, paddingHorizontal: 16, height: TOUCH, alignItems: 'center', justifyContent: 'center' },
   airportText: { flex: 1, paddingVertical: 4 },
   airportCity: { fontFamily: FONTS.bodyMedium, fontSize: 14 },
   airportName: { fontFamily: FONTS.body, fontSize: 12 },

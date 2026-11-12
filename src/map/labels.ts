@@ -26,6 +26,8 @@ export const LABEL_DROP = 5;
 export function labelBudget(zoom: number): { max: number; upTo: number } {
   if (zoom < MORPH_START) return { max: 16, upTo: 1 };
   if (zoom < MORPH_END) return { max: 26, upTo: 2 };
+  // Zoomed far in, airports are spread out, so nearly every one on screen can have its name
+  if (zoom >= 6) return { max: 80, upTo: 3 };
   return { max: 44, upTo: 3 };
 }
 

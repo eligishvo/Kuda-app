@@ -9,6 +9,7 @@ import { StatusBar } from 'expo-status-bar';
 import { View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { ReportButton } from '../report/ReportButton';
 import { ResultsProvider } from '../results/useResults';
 import { SearchProvider } from '../search/SearchContext';
 import { SelectionProvider } from '../selection/useSelection';
@@ -25,6 +26,8 @@ function Screens() {
           headerTintColor: t.text,
           headerTitleStyle: { fontFamily: FONTS.heading },
           contentStyle: { backgroundColor: t.background },
+          // Every screen's header has the report button (the map has its own, floating)
+          headerRight: () => <ReportButton />,
         }}
       >
         <Stack.Screen name="index" options={{ headerShown: false }} />
@@ -33,6 +36,7 @@ function Screens() {
         <Stack.Screen name="destination" options={{ title: 'Flights' }} />
         <Stack.Screen name="planner" options={{ title: 'Planner' }} />
         <Stack.Screen name="settings" options={{ title: 'Settings' }} />
+        <Stack.Screen name="report" options={{ title: 'Report a problem', headerRight: undefined }} />
         <Stack.Screen name="debug" options={{ title: 'Flight data (debug)' }} />
       </Stack>
       <StatusBar style="light" />

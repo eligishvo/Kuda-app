@@ -34,7 +34,7 @@ the same code as the app: the quickest way to look at a map change without a pho
 
 | Path | What |
 |---|---|
-| `src/app/` | Screens (Expo Router): `index.tsx` map + selection sheet, `search.tsx` search form, `results.tsx` results list with filters, `destination.tsx` live flights, `planner.tsx` placeholder, `settings.tsx`, `debug.tsx`, `_layout.tsx` |
+| `src/app/` | Screens (Expo Router): `index.tsx` map + selection sheet, `search.tsx` search form, `results.tsx` results list with filters, `destination.tsx` live flights, `planner.tsx` placeholder, `report.tsx` report form, `settings.tsx`, `debug.tsx`, `_layout.tsx` |
 | `src/map/projection.ts` | The globe-to-flat projection maths (worklets; unit tested) |
 | `src/map/draw.ts` | Turns countries, graticule and airports into paths for one frame (worklets) |
 | `src/map/GlobeMap.tsx` | Skia canvas + drag / pinch / tap gestures |
@@ -48,7 +48,7 @@ the same code as the app: the quickest way to look at a map change without a pho
 | `src/search/` | The trip being searched: departure, dates, trip length, travelers, budget (rules + shared state) |
 | `src/ui/` | Shared pieces: selection sheet, results sheet, calendar, stepper |
 | `src/theme/` | The three themes as token objects, and the theme provider |
-| `src/report/` | "Report a problem" → High Command relay |
+| `src/report/` | "Report a problem" → High Command relay: the form, the "!" button on every screen, the rules |
 | `src/storage/` | AsyncStorage wrapper |
 | `tests/` | vitest |
 | `src/api/client.ts` | Calls the Worker (address and app token are typed in on the debug screen, kept on the phone) |
@@ -83,6 +83,7 @@ the same code as the app: the quickest way to look at a map change without a pho
 
 ## High Command
 
-Tickets live in `eligishvo/High-Command` as issues labelled `app:kuda`. The "Report a problem" form in Settings
-posts to the relay (`app.json` → `expo.extra.highCommand.reportUrl`, `POST /report`). For one ticket the owner
+Tickets live in `eligishvo/High-Command` as issues labelled `app:kuda`. The "!" report button (in every screen's
+header, floating on the map; new screens get it automatically from `_layout.tsx`) opens `/report`, which posts to
+the relay (`app.json` → `expo.extra.highCommand.reportUrl`, `POST /report`). For one ticket the owner
 pastes its Brief from High Command: follow it and nothing else.
