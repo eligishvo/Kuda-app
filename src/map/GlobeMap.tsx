@@ -6,10 +6,12 @@ import { useCallback, useEffect, useState } from 'react';
 import { LayoutChangeEvent, StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { cancelAnimation, runOnJS, useDerivedValue, useSharedValue, withDecay } from 'react-native-reanimated';
-import { START_VIEW } from '../config';
 import { Theme } from '../theme/themes';
 import { drawAirports, drawCountries, drawGraticule } from './draw';
-import { Hit, hitTest } from './hitTest';
+import { Hit, hitPin, hitTest } from './hitTest';
+import { Pin, PIN_H, PIN_LIFT, PIN_W, pinShows } from './pins';
+import { PricePins } from './PricePins';
+import { MapView } from './useMapView';
 import { AIRPORT_GEO, AIRPORTS, COUNTRIES_HIGH, COUNTRIES_LOW, GEO_HIGH, GEO_LOW, GRATICULE } from './mapData';
 import {
   BASE_RADIUS, centerToPin, clampZoom, DEG, dragCenter, invert, makeView, MAX_LAT, MORPH_END, project,
@@ -20,6 +22,10 @@ export const DETAIL_ZOOM = 2.6;
 
 type Props = {
   theme: Theme;
+  /** Where the map is looking (shared with the screen, so it can move the map). */
+  view: MapView;
+  /** Price labels to show on the map. */
+  pins: Pin[];
   /** Per country of the coarse / detailed border files: 0 plain, 1 selected, 2 partly selected, 3 home. */
   flagsLow: number[];
   flagsHigh: number[];
@@ -31,7 +37,7 @@ type Props = {
   onHit: (hit: Hit, flat: boolean) => void;
 };
 
-export function GlobeMap({ theme, flagsLow, flagsHigh, airportFlags, departures, onHit }: Props) {
+export function GlobeMap({ theme, view, pins, flagsLow, flagsHigh, airportFlags, departures, onHit }: Props) {
   const [size, setSize] = useState({ w: 0, h: 0 });
   const w = size.w;
   const h = size.h;
@@ -41,9 +47,7 @@ export function GlobeMap({ theme, flagsLow, flagsHigh, airportFlags, departures,
   }, []);
 
   // Where the map is looking: the place in the middle of the screen, and the zoom
-  const lon = useSharedValue(START_VIEW.lon);
-  const lat = useSharedValue(START_VIEW.lat);
-  const zoom = useSharedValue(START_VIEW.zoom);
+  const { lon, lat, zoom } = view;
 
   // Selection, mirrored to the UI thread
   const low = useSharedValue(flagsLow);
@@ -120,6 +124,7 @@ export function GlobeMap({ theme, flagsLow, flagsHigh, airportFlags, departures,
     .onBegin(() => {
       cancelAnimation(lon);
       cancelAnimation(lat);
+      cancelAnimation(zoom);
     })
     .onChange((e) => {
       const R = Math.min(w, h) * BASE_RADIUS * zoom.value;
@@ -162,12 +167,18 @@ export function GlobeMap({ theme, flagsLow, flagsHigh, airportFlags, departures,
     (x: number, y: number, lon0: number, lat0: number, z: number) => {
       const v = makeView(lon0, lat0, z, w, h);
       const detailed = z >= DETAIL_ZOOM;
+      // Price pins sit on top of everything, so they get the tap first
+      const pin = hitPin(v, x, y, pins, { w: PIN_W, h: PIN_H, lift: PIN_LIFT }, pinShows);
+      if (pin) {
+        onHit({ kind: 'pin', code: pin.code }, z >= MORPH_END);
+        return;
+      }
       onHit(
         hitTest(v, x, y, AIRPORTS, detailed ? COUNTRIES_HIGH : COUNTRIES_LOW, detailed ? GEO_HIGH.caps : GEO_LOW.caps),
         z >= MORPH_END,
       );
     },
-    [w, h, onHit],
+    [w, h, onHit, pins],
   );
 
   const tap = Gesture.Tap()
@@ -213,6 +224,7 @@ export function GlobeMap({ theme, flagsLow, flagsHigh, airportFlags, departures,
             <Path path={depRings} style="stroke" strokeWidth={1.5} color={theme.departureRing} />
           </Canvas>
         )}
+        {w > 0 && h > 0 && pins.length > 0 && <PricePins theme={theme} pins={pins} view={view} width={w} height={h} />}
       </View>
     </GestureDetector>
   );

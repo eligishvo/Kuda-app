@@ -4,10 +4,33 @@ import { geoContains } from 'd3-geo';
 import { CountryData, toXyz } from './geometry';
 import { invert, MORPH_END, project, View } from './projection';
 
-export type Hit = { kind: 'airport'; code: string; cc: string } | { kind: 'country'; cc: string } | null;
+export type Hit = { kind: 'pin'; code: string } | { kind: 'airport'; code: string; cc: string } | { kind: 'country'; cc: string } | null;
 
 /** How close (pixels) a tap must be to an airport dot. 22 gives each dot a 44-pixel target. */
 export const AIRPORT_REACH = 22;
+
+type PinLike = { code: string; lon: number; lat: number; kind: 'live' | 'estimate' | 'rough' | 'none'; rank: number };
+
+/**
+ * The price pin under a tap, if any. `box` describes the label: its width and height, and how far it floats
+ * above the airport; `shows` says whether a pin's label is visible at this zoom (same rule as the drawing).
+ */
+export function hitPin(
+  v: View, x: number, y: number, pins: PinLike[],
+  box: { w: number; h: number; lift: number },
+  shows: (kind: PinLike['kind'], rank: number, zoom: number) => boolean,
+): PinLike | null {
+  let best: PinLike | null = null;
+  for (const pin of pins) {
+    if (!shows(pin.kind, pin.rank, v.zoom)) continue;
+    const p = project(v, pin.lon, pin.lat);
+    if (!p) continue;
+    // A little slack around the label so it is easy to hit; the cheapest pin wins where labels overlap
+    const inside = Math.abs(x - p.x) <= box.w / 2 + 4 && y >= p.y - box.h - box.lift - 6 && y <= p.y + 6;
+    if (inside && (!best || pin.rank < best.rank)) best = pin;
+  }
+  return best;
+}
 
 type AirportLike = { code: string; cc: string; lat: number; lon: number; large: boolean };
 

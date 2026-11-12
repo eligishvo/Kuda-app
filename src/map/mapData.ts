@@ -50,3 +50,10 @@ export function countriesWithAirports() {
   }
   return withAirports;
 }
+
+/** An airport the way people say it: the city it serves, then the code, e.g. "Sofia (SOF)". */
+export function airportLabel(code: string): string {
+  const a = byCode.get(code);
+  const place = a?.city || a?.name;
+  return place ? `${place} (${code})` : code;
+}

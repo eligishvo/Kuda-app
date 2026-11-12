@@ -11,6 +11,8 @@ type Props = {
   chips: Chip[];
   onRemove: (cc: string) => void;
   onClear: () => void;
+  /** The main button under the chips (e.g. "Search flights"). */
+  action?: { label: string; onPress: () => void; busy?: boolean; note?: string };
   /** Set while narrowing one country down to some airports. */
   narrow?: {
     cc: string;
@@ -24,7 +26,7 @@ type Props = {
   };
 };
 
-export function SelectionSheet({ theme: t, chips, onRemove, onClear, narrow }: Props) {
+export function SelectionSheet({ theme: t, chips, onRemove, onClear, action, narrow }: Props) {
   const insets = useSafeAreaInsets();
   const sheet = [styles.sheet, { backgroundColor: t.panel, borderColor: t.border, paddingBottom: insets.bottom + 12 }];
 
@@ -67,9 +69,10 @@ export function SelectionSheet({ theme: t, chips, onRemove, onClear, narrow }: P
                   {on && <Text style={[styles.checkMark, { color: t.buttonText }]}>✓</Text>}
                 </View>
                 <Text style={[styles.code, { color: t.text }]}>{a.code}</Text>
-                <Text style={[styles.airportName, { color: t.muted }]} numberOfLines={1}>
-                  {a.city || a.name}
-                </Text>
+                <View style={styles.airportText}>
+                  <Text style={[styles.airportCity, { color: t.text }]} numberOfLines={1}>{a.city || a.name}</Text>
+                  {a.city !== '' && <Text style={[styles.airportName, { color: t.muted }]} numberOfLines={1}>{a.name}</Text>}
+                </View>
               </Pressable>
             );
           })}
@@ -86,7 +89,8 @@ export function SelectionSheet({ theme: t, chips, onRemove, onClear, narrow }: P
       </View>
       {chips.length === 0 ? (
         <Text style={[styles.hint, { color: t.muted }]}>
-          Tap a country to add it. Pinch in to see its airports and pick only some.
+          Tap a country to add it. Pinch in to see its airports and pick only some. With nothing picked, the search
+          looks everywhere.
         </Text>
       ) : (
         <ScrollView style={styles.chipScroll} contentContainerStyle={styles.chips}>
@@ -107,6 +111,19 @@ export function SelectionSheet({ theme: t, chips, onRemove, onClear, narrow }: P
             </View>
           ))}
         </ScrollView>
+      )}
+      {action && (
+        <>
+          <Pressable
+            onPress={action.onPress}
+            disabled={action.busy}
+            accessibilityRole="button"
+            style={[styles.action, { backgroundColor: t.accent, opacity: action.busy ? 0.6 : 1 }]}
+          >
+            <Text style={[styles.actionText, { color: t.buttonText }]}>{action.label}</Text>
+          </Pressable>
+          {action.note ? <Text style={[styles.note, { color: t.muted }]}>{action.note}</Text> : null}
+        </>
       )}
     </View>
   );
@@ -142,7 +159,7 @@ const styles = StyleSheet.create({
   title: { fontFamily: FONTS.heading, fontSize: 18, flexShrink: 1 },
   count: { fontFamily: FONTS.bodyMedium, fontSize: 14 },
   hint: { fontFamily: FONTS.body, fontSize: 14, lineHeight: 20, paddingBottom: 4 },
-  chipScroll: { maxHeight: 156 },
+  chipScroll: { maxHeight: 108 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingBottom: 4 },
   chip: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 22, paddingLeft: 14, height: TOUCH, maxWidth: '100%' },
   chipText: { fontFamily: FONTS.bodyMedium, fontSize: 14, flexShrink: 1 },
@@ -159,5 +176,10 @@ const styles = StyleSheet.create({
   check: { width: 24, height: 24, borderRadius: 6, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
   checkMark: { fontSize: 14, fontWeight: '700', lineHeight: 18 },
   code: { fontFamily: FONTS.bodyBold, fontSize: 15, width: 44 },
-  airportName: { fontFamily: FONTS.body, fontSize: 14, flex: 1 },
+  airportText: { flex: 1, paddingVertical: 4 },
+  airportCity: { fontFamily: FONTS.bodyMedium, fontSize: 14 },
+  airportName: { fontFamily: FONTS.body, fontSize: 12 },
+  action: { borderRadius: 24, minHeight: TOUCH + 4, alignItems: 'center', justifyContent: 'center', marginTop: 10 },
+  actionText: { fontFamily: FONTS.bodyBold, fontSize: 16 },
+  note: { fontFamily: FONTS.body, fontSize: 12, lineHeight: 17, paddingTop: 6 },
 });

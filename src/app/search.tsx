@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { addDays } from '../../shared/dates';
-import { airportsIn, countriesWithAirports } from '../map/mapData';
+import { airportLabel, airportsIn, countriesWithAirports } from '../map/mapData';
 import { LIMITS, nightsText, shortDate, travelersText } from '../search/search';
 import { useSearch } from '../search/SearchContext';
 import { useTheme } from '../theme/ThemeContext';
@@ -86,8 +86,8 @@ export default function SearchScreen() {
               accessibilityState={{ checked: on }}
               style={[styles.chip, { backgroundColor: on ? t.accent : t.chip, borderColor: on ? t.accent : t.border }]}
             >
-              <Text style={[styles.chipText, { color: on ? t.buttonText : t.text }]}>{a.code}</Text>
-              <Text style={[styles.small, { color: on ? t.buttonText : t.muted }]} numberOfLines={1}>{a.city || a.name}</Text>
+              <Text style={[styles.chipText, { color: on ? t.buttonText : t.text }]} numberOfLines={1}>{a.city || a.name} ({a.code})</Text>
+              {a.city !== '' && <Text style={[styles.small, { color: on ? t.buttonText : t.muted }]} numberOfLines={1}>{a.name}</Text>}
             </Pressable>
           );
         })}
@@ -125,7 +125,7 @@ export default function SearchScreen() {
       />
 
       <Summary theme={t} lines={[
-        `From ${search.departureAirports.join(', ')}`,
+        `From ${search.departureAirports.map(airportLabel).join(', ')}`,
         `${shortDate(search.earliestOut)} – ${shortDate(search.latestRet)}, ${nightsText(search)}`,
         `${travelersText(search.adults)}, up to $${search.budget} each${search.adults > 1 ? ` ($${search.budget * search.adults} in total)` : ''}`,
       ]} />
@@ -156,7 +156,7 @@ const styles = StyleSheet.create({
   countries: { maxHeight: 280 },
   country: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', minHeight: TOUCH + 2, borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: 4 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: { borderWidth: 1, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 6, minHeight: TOUCH, justifyContent: 'center', maxWidth: '48%' },
+  chip: { borderWidth: 1, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 6, minHeight: TOUCH, justifyContent: 'center', maxWidth: '100%' },
   chipText: { fontFamily: FONTS.bodyBold, fontSize: 15 },
   summary: { borderWidth: 1, borderRadius: 14, padding: 12, gap: 4, marginTop: 16 },
 });

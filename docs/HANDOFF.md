@@ -44,6 +44,21 @@ Built in phase 2b:
   colour and can't be picked as a destination; every departure airport gets a ring.
 - The default budget is one constant: `DEFAULT_BUDGET` in `src/search/search.ts`.
 
+Built in phase 3:
+- `src/results/results.ts`: `planCalls` (one Google Explore call per month you could leave in, at most four;
+  free Travelpayouts calls per month and month pair) and `buildResults` (Google's price first, Travelpayouts to
+  fill gaps, "no estimate" for selected airports with nothing; filtered by the date window and the budget).
+- `useResults`: runs the calls when the user taps "Search flights" (never by itself), shows progress and the
+  searches left today, and re-filters without a new search when the destinations or budget change. Changing the
+  dates, trip length or departure marks the prices as out of date.
+- Price pins on the map (`src/map/PricePins.tsx`): solid for Google's prices, dashed for estimates, "?" for no
+  estimate; only the cheapest 10 show on the globe, 25 while it flattens, all on the flat map. Tapping a pin
+  highlights its row.
+- Results sheet (`src/ui/ResultsSheet.tsx`): ranked list with city, code, airport name, dates, nights, stops and
+  price; tapping a row flies the map there. "Destinations" switches back to the selection.
+- Airports are written with their city everywhere: "Sofia (SOF)" in chips, the trip summary and results; lists
+  also show the full airport name.
+
 ## How to test on a phone
 
 1. In the repo folder: `git pull`, `npm install`, `npx expo start`.
@@ -61,6 +76,14 @@ Built in phase 2b:
    same button should say "from cache (free)"). "Explore Greece" checks the country search.
 4. Tap "Flights ×2 adults" and compare its prices with "Flights": that answers the open question below.
 
+## How to test phase 3
+
+Needs the Worker address and token saved on the debug screen. Select Greece and Italy, tap "Search flights":
+progress shows, then pins and a list. Pinch in to see more pins; tap a pin (its row highlights); tap a row (the
+map flies there). Tap "Destinations", add a country, "Show results": the list changes without a new search.
+Lower the budget in Trip details: fewer results. Change the dates: a note asks to Refresh. With nothing
+selected, "Search everywhere" lists every priced destination.
+
 ## How to test phase 2b
 
 On the map, tap the summary under "Kuda". Change the country (e.g. Greece) and pick two airports; pick a date
@@ -77,6 +100,8 @@ rings on the map should follow. Close and reopen the app: the search should stil
 ## Not verified
 
 - Phase 2b on a phone (calendar taps, the country list, the summary pill's size on a small screen).
+- Phase 3 on a phone: pins following the map, pin taps, the results list, and how many Google results actually
+  fit a real date window (Google picks the dates; a narrow window may leave most airports with "no estimate").
 - Speed on other phones: the globe was smooth enough on the owner's phone that he reported no problem, but no
   frame rate was measured. If dragging stutters, try a lower `KEEP_50M` in `scripts/build-map-data.mjs`.
 - The fixtures in `tests/fixtures/` were written by hand from the API documentation. The real calls worked on the
@@ -95,8 +120,12 @@ rings on the map should follow. Close and reopen the app: the search should stil
 - **Is Google's price per person or for everyone (adults > 1)?** Still open: the owner said prices "seem to
   work" but didn't report the two numbers. Compare "Flights" and "Flights ×2 adults" on the debug screen before
   phase 4 shows totals. The app asks Explore and estimates with 1 adult, so those prices are per person.
-- **Several departure airports:** the search allows more than one, but Explore and the estimates take one origin
-  per call. Phase 3 has to decide: one call per airport (more searches) or only the first airport.
+- **Several departure airports:** the search allows more than one, but prices are fetched from the first one
+  only (one origin per call; more would multiply the searches). Offered to the owner, no answer yet.
+- **Country searches** (`arrival_area_id`) are not used: they need Google's id for each country and failed for
+  some in the brief's tests. Results come from the "anywhere" call filtered to the selection, as the brief allows.
+- **While results show, map taps don't change the destinations** (only pins respond); "Destinations" goes back.
+- **"No estimate — tap to check"** pins and rows exist, but the check itself is phase 4 (live flight search).
 - **Calendar:** written in the app (`src/ui/Calendar.tsx`) instead of adding a date-picker library, so it follows
   the themes and needs no native code. Weeks start on Sunday.
 - **App token:** typed into the debug screen and kept on the phone, not stored in `app.json`, so it never reaches
@@ -126,6 +155,8 @@ None recorded yet (nothing has run on a phone).
 
 ## Changelog
 
+- **2026-11-12** — Phase 3: price search plan and results rules, price pins, results sheet, "Search flights".
+  Airports shown as "City (CODE)" with full names in lists (owner's request). 95 tests passing. Not yet on a phone.
 - **2026-11-12** — Phase 2b: search rules and saved state, Trip details screen, calendar, steppers, summary on
   the map, departure rings from the search. 80 tests passing. Not yet tried on the phone.
 - **2026-11-12** — Owner ran the app in Expo Go: globe, selection, themes, settings and the debug screen's Usage

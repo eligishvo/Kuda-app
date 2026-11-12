@@ -43,18 +43,24 @@ describe('selection', () => {
     expect(s).toEqual({ GR: 'all' });
   });
 
-  it('writes the chips the way the brief shows them', () => {
+  it('writes the chips with each airport’s city and code', () => {
+    const names: Record<string, string> = { GR: 'Greece', IT: 'Italy', US: 'United States', EH: 'W. Sahara', BG: 'Bulgaria' };
+    const cities: Record<string, string> = { FCO: 'Rome', NAP: 'Naples', SOF: 'Sofia', ATL: 'Atlanta', BOS: 'Boston' };
     const list = chips(
-      { GR: 'all', IT: ['FCO', 'NAP'], US: ['ATL', 'BOS', 'JFK', 'LAX', 'ORD'], EH: 'all' },
-      (cc) => ({ GR: 'Greece', IT: 'Italy', US: 'United States', EH: 'W. Sahara' })[cc] ?? cc,
+      { GR: 'all', IT: ['FCO', 'NAP'], US: ['ATL', 'BOS', 'JFK', 'LAX', 'ORD'], EH: 'all', BG: ['SOF'] },
+      (cc) => names[cc] ?? cc,
       (cc) => (cc === 'GR' ? ['ATH', 'SKG', 'HER'] : cc === 'IT' ? IT : []),
+      (code) => (cities[code] ? `${cities[code]} (${code})` : code),
     );
     expect(list.map((c) => c.label)).toEqual([
+      'Bulgaria · Sofia (SOF)',
       'Greece · all 3',
-      'Italy · FCO, NAP',
-      'United States · ATL, BOS, JFK +2',
+      'Italy · Rome (FCO), Naples (NAP)',
+      'United States · Atlanta (ATL), Boston (BOS) +3',
       'W. Sahara · no airports',
     ]);
+    // Without a label function the bare codes are used
+    expect(chips({ IT: ['FCO', 'NAP'] }, (cc) => cc, () => IT)[0].label).toBe('IT · FCO, NAP');
   });
 
   it('lists every selected airport', () => {

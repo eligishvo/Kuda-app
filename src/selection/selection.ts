@@ -53,11 +53,15 @@ export function isAirportSelected(sel: Selection, cc: string, code: string): boo
 
 export type Chip = { cc: string; label: string };
 
-/** The removable chips in the selection sheet, e.g. "Greece · all 25", "Italy · FCO, NAP". */
+/**
+ * The removable chips in the selection sheet, e.g. "Greece · all 25", "Italy · Rome (FCO), Naples (NAP)".
+ * `labelOf` writes one airport (city and code); without it the bare code is used.
+ */
 export function chips(
   sel: Selection,
   nameOf: (cc: string) => string,
   airportsOf: (cc: string) => string[],
+  labelOf: (code: string) => string = (code) => code,
 ): Chip[] {
   return Object.keys(sel)
     .map((cc) => {
@@ -65,8 +69,8 @@ export function chips(
       const all = airportsOf(cc);
       let detail: string;
       if (s === 'all') detail = all.length === 0 ? 'no airports' : `all ${all.length}`;
-      else if (s.length <= 3) detail = s.join(', ');
-      else detail = `${s.slice(0, 3).join(', ')} +${s.length - 3}`;
+      else if (s.length <= 2) detail = s.map(labelOf).join(', ');
+      else detail = `${s.slice(0, 2).map(labelOf).join(', ')} +${s.length - 2}`;
       return { cc, label: `${nameOf(cc)} · ${detail}` };
     })
     .sort((a, b) => a.label.localeCompare(b.label));

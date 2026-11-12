@@ -1,27 +1,40 @@
-// Home screen: the map, with the selection sheet at the bottom and the settings button on top.
+// Home screen: the map, the trip summary on top, and a bottom panel that is either the destination
+// selection or, after "Search flights", the results.
 import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GlobeMap } from '../map/GlobeMap';
 import { Hit } from '../map/hitTest';
-import { airportByCode, airportCodesIn, AIRPORTS, airportsIn, countryName, GEO_HIGH, GEO_LOW } from '../map/mapData';
+import { airportByCode, airportCodesIn, airportLabel, AIRPORTS, airportsIn, countryName, GEO_HIGH, GEO_LOW } from '../map/mapData';
+import { Pin } from '../map/pins';
+import { flyTo, useMapView } from '../map/useMapView';
+import { priceText, Result } from '../results/results';
+import { useResults } from '../results/useResults';
 import { nightsText, shortDate } from '../search/search';
 import { useSearch } from '../search/SearchContext';
 import {
-  chips, countryState, EMPTY, isAirportSelected, removeCountry, selectAll, toggleAirport, toggleCountry,
+  chips, countryState, EMPTY, isAirportSelected, removeCountry, selectAll, selectedAirports, toggleAirport, toggleCountry,
 } from '../selection/selection';
 import { useSelection } from '../selection/useSelection';
 import { useTheme } from '../theme/ThemeContext';
 import { FONTS, TOUCH } from '../theme/themes';
+import { ResultsSheet } from '../ui/ResultsSheet';
 import { SelectionSheet } from '../ui/SelectionSheet';
 
 export default function Home() {
   const t = useTheme();
   const insets = useSafeAreaInsets();
+  const view = useMapView();
   const [selection, update] = useSelection();
   const { search } = useSearch();
   const homeCc = search.departureCc;
+  /** The country whose airports are listed in the sheet, if any. */
+  const [narrowCc, setNarrowCc] = useState<string | null>(null);
+  /** Which bottom panel is showing. */
+  const [showResults, setShowResults] = useState(false);
+  /** The airport whose pin or result row was tapped last. */
+  const [focused, setFocused] = useState<string | null>(null);
 
   // The country you fly from can't also be a destination: drop it if it was selected before
   useEffect(() => {
@@ -35,8 +48,6 @@ export default function Home() {
     }),
     [search.departureAirports],
   );
-  /** The country whose airports are listed in the sheet, if any. */
-  const [narrowCc, setNarrowCc] = useState<string | null>(null);
 
   // What the map needs to colour countries and airports
   const flagOf = useCallback(
@@ -50,12 +61,29 @@ export default function Home() {
     [selection],
   );
 
+  // Prices: fetched when the user asks, re-filtered whenever the destinations or the budget change
+  const selectedCodes = useMemo(() => selectedAirports(selection, airportCodesIn), [selection]);
+  const found = useResults(search, selectedCodes);
+  const pins: Pin[] = useMemo(() => {
+    if (!showResults || !found.results) return [];
+    return found.results.list.map((r, rank) => ({
+      code: r.airport, lon: r.lon, lat: r.lat, label: priceText(r, true), kind: r.kind, rank, focused: r.airport === focused,
+    }));
+  }, [showResults, found.results, focused]);
+
   const onHit = useCallback(
     (hit: Hit, flat: boolean) => {
       if (!hit) {
         setNarrowCc(null);
+        setFocused(null);
         return;
       }
+      if (hit.kind === 'pin') {
+        setFocused(hit.code);
+        return;
+      }
+      // While results are showing, the map is for looking: taps don't change the destinations
+      if (showResults) return;
       // The departure country isn't a destination
       if (hit.cc === homeCc) return;
       if (hit.kind === 'airport') {
@@ -70,18 +98,38 @@ export default function Home() {
       setNarrowCc(null);
       update((s) => toggleCountry(s, hit.cc));
     },
-    [selection, update, homeCc],
+    [selection, update, homeCc, showResults],
   );
 
-  const chipList = useMemo(() => chips(selection, countryName, airportCodesIn), [selection]);
+  const chipList = useMemo(() => chips(selection, countryName, airportCodesIn, airportLabel), [selection]);
   const narrowing = narrowCc != null && selection[narrowCc] ? narrowCc : null;
+
+  const startSearch = () => {
+    setNarrowCc(null);
+    setFocused(null);
+    setShowResults(true);
+    found.run();
+  };
+  const pickResult = (r: Result) => {
+    setFocused(r.airport);
+    flyTo(view, r.lon, r.lat);
+  };
 
   return (
     <View style={[styles.fill, { backgroundColor: t.background }]}>
-      <GlobeMap theme={t} flagsLow={flagsLow} flagsHigh={flagsHigh} airportFlags={airportFlags} departures={departures} onHit={onHit} />
+      <GlobeMap
+        theme={t}
+        view={view}
+        pins={pins}
+        flagsLow={flagsLow}
+        flagsHigh={flagsHigh}
+        airportFlags={airportFlags}
+        departures={departures}
+        onHit={onHit}
+      />
       <View style={[styles.top, { top: insets.top + 8 }]} pointerEvents="box-none">
         <View style={styles.left} pointerEvents="box-none">
-          <Text style={[styles.brand, { color: t.text }]} pointerEvents="none">Kuda</Text>
+          <Text style={[styles.brand, { color: t.text }]}>Kuda</Text>
           {/* The search in short; tap to change it */}
           <Pressable
             onPress={() => router.push('/search')}
@@ -90,10 +138,13 @@ export default function Home() {
             style={[styles.trip, { backgroundColor: t.panel, borderColor: t.border }]}
           >
             <Text style={[styles.tripMain, { color: t.text }]} numberOfLines={1}>
-              From {search.departureAirports.join(', ')} · {shortDate(search.earliestOut)} – {shortDate(search.latestRet)}
+              From {search.departureAirports.map(airportLabel).join(', ')}
             </Text>
             <Text style={[styles.tripSub, { color: t.muted }]} numberOfLines={1}>
-              {nightsText(search)} · {search.adults} {search.adults === 1 ? 'traveler' : 'travelers'} · up to <Text style={{ color: t.price }}>${search.budget}</Text> each
+              {shortDate(search.earliestOut)} – {shortDate(search.latestRet)} · {nightsText(search)}
+            </Text>
+            <Text style={[styles.tripSub, { color: t.muted }]} numberOfLines={1}>
+              {search.adults} {search.adults === 1 ? 'traveler' : 'travelers'} · up to <Text style={{ color: t.price }}>${search.budget}</Text> each
             </Text>
           </Pressable>
         </View>
@@ -106,32 +157,53 @@ export default function Home() {
           <Text style={[styles.settingsIcon, { color: t.text }]}>⚙</Text>
         </Pressable>
       </View>
-      <SelectionSheet
-        theme={t}
-        chips={chipList}
-        onRemove={(cc) => update((s) => removeCountry(s, cc))}
-        onClear={() => {
-          setNarrowCc(null);
-          update(() => EMPTY);
-        }}
-        narrow={
-          narrowing
-            ? {
-                cc: narrowing,
-                name: countryName(narrowing),
-                airports: airportsIn(narrowing),
-                isSelected: (code) => isAirportSelected(selection, narrowing, code),
-                onToggle: (code) => update((s) => toggleAirport(s, narrowing, code, airportCodesIn(narrowing))),
-                onAll: () => update((s) => selectAll(s, narrowing)),
-                onRemove: () => {
-                  setNarrowCc(null);
-                  update((s) => removeCountry(s, narrowing));
-                },
-                onDone: () => setNarrowCc(null),
-              }
-            : undefined
-        }
-      />
+      {showResults ? (
+        <ResultsSheet
+          theme={t}
+          results={found.results}
+          loading={found.status === 'loading'}
+          progress={found.progress}
+          error={found.error ?? (found.stale && found.status !== 'loading' ? 'Trip details changed since these prices were fetched. Tap Refresh.' : null)}
+          usage={found.usage}
+          budget={search.budget}
+          focused={focused}
+          onPick={pickResult}
+          onEdit={() => setShowResults(false)}
+          onRefresh={found.run}
+        />
+      ) : (
+        <SelectionSheet
+          theme={t}
+          chips={chipList}
+          onRemove={(cc) => update((s) => removeCountry(s, cc))}
+          onClear={() => {
+            setNarrowCc(null);
+            update(() => EMPTY);
+          }}
+          action={{
+            label: found.results && !found.stale ? 'Show results' : chipList.length === 0 ? 'Search everywhere' : 'Search flights',
+            onPress: found.results && !found.stale ? () => setShowResults(true) : startSearch,
+            note: found.results && !found.stale ? 'Prices already fetched. Use Refresh there to search again.' : 'Uses a few of today’s price searches; repeats within 12 hours are free.',
+          }}
+          narrow={
+            narrowing
+              ? {
+                  cc: narrowing,
+                  name: countryName(narrowing),
+                  airports: airportsIn(narrowing),
+                  isSelected: (code) => isAirportSelected(selection, narrowing, code),
+                  onToggle: (code) => update((s) => toggleAirport(s, narrowing, code, airportCodesIn(narrowing))),
+                  onAll: () => update((s) => selectAll(s, narrowing)),
+                  onRemove: () => {
+                    setNarrowCc(null);
+                    update((s) => removeCountry(s, narrowing));
+                  },
+                  onDone: () => setNarrowCc(null),
+                }
+              : undefined
+          }
+        />
+      )}
     </View>
   );
 }
@@ -139,8 +211,8 @@ export default function Home() {
 const styles = StyleSheet.create({
   fill: { flex: 1 },
   top: { position: 'absolute', left: 16, right: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-  brand: { fontFamily: FONTS.heading, fontSize: 28 },
   left: { flex: 1, alignItems: 'flex-start', paddingRight: 12 },
+  brand: { fontFamily: FONTS.heading, fontSize: 28 },
   trip: { borderWidth: 1, borderRadius: 14, paddingHorizontal: 12, paddingVertical: 7, marginTop: 6, minHeight: TOUCH, justifyContent: 'center', maxWidth: '100%' },
   tripMain: { fontFamily: FONTS.bodyMedium, fontSize: 13 },
   tripSub: { fontFamily: FONTS.body, fontSize: 12, marginTop: 1 },
