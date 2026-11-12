@@ -1,0 +1,35 @@
+{
+  "expo": {
+    "name": "Kuda",
+    "slug": "kuda",
+    "owner": "elidesigninc",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#050505",
+    "scheme": "kuda",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.eligishvo.kuda"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#050505",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "package": "com.eligishvo.kuda"
+    },
+    "plugins": ["expo-router", "expo-font"],
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "extra": {
+      "highCommand": {
+        "reportUrl": "https://high-command-relay.eligishvo.workers.dev"
+      }
+    }
+  }
+}

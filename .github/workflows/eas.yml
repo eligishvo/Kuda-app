@@ -1,0 +1,94 @@
+# On every push to main:
+#   1. checks  — type check, unit tests, Android bundle
+#   2. publish — sends the update to phones (EAS Update, branch "preview"), only if 1 passed
+# Add "[build]" to a commit message (or run manually with "build" ticked) to also build a new installable
+# Android app. Add "[skip ci]" to a commit message to run nothing (Expo updates are limited: batch changes).
+# Needs one repo secret: EXPO_TOKEN (Settings → Secrets and variables → Actions), from an Expo account
+# that can publish to the project elidesigninc/kuda.
+name: Checks, update & build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      build:
+        description: Build a new installable app (needed after native changes)
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: eas-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  checks:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: scripts/ci-step.sh "Install" npm ci
+      - name: Type check
+        run: scripts/ci-step.sh "Type check" npm run typecheck
+      - name: Unit tests
+        run: scripts/ci-step.sh "Tests" npx vitest run --reporter=default
+      - name: Android bundle builds
+        run: scripts/ci-step.sh "Android bundle" npx expo export --platform android --output-dir dist-android
+
+  publish:
+    needs: [checks]
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check that EXPO_TOKEN is set
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "::error::Add an EXPO_TOKEN secret: repo Settings → Secrets and variables → Actions"
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - run: npm ci
+
+      - name: Link Expo project (first run only)
+        run: |
+          if node -e "process.exit(require('./app.json').expo.extra?.eas?.projectId ? 0 : 1)"; then
+            echo "Already linked"
+          else
+            eas init --non-interactive --force
+            node scripts/link-expo-project.js
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add app.json
+            git commit -m "Link Expo project [skip ci]"
+            git push
+          fi
+
+      - name: Build installable Android app
+        if: (github.event_name == 'workflow_dispatch' && inputs.build) || contains(github.event.head_commit.message, '[build]')
+        run: eas build --profile preview --platform android --non-interactive --no-wait
+
+      - name: Publish update
+        env:
+          MESSAGE: ${{ github.event.head_commit.message || 'Manual update' }}
+        run: eas update --branch preview --message "$(echo "$MESSAGE" | head -n 1)" --non-interactive
