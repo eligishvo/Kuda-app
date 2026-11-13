@@ -1,0 +1,35 @@
+# Run manually to see what the Worker returns for a search and why each price is kept or dropped.
+# Replaying a search done in the app within the last 12 hours uses no SerpApi searches (answers are cached).
+name: Diagnose search
+
+on:
+  workflow_dispatch:
+    inputs:
+      from: { description: 'Earliest departure (YYYY-MM-DD)', required: true }
+      to: { description: 'Latest return (YYYY-MM-DD)', required: true }
+      min: { description: 'Shortest trip (days)', required: true }
+      max: { description: 'Longest trip (days)', required: true }
+      budget: { description: 'Budget per person ($)', required: false, default: '9999' }
+      dest: { description: 'Destination airports to focus on, e.g. VIE GRZ BRU', required: false, default: '' }
+      origin: { description: 'Departure airport', required: false, default: 'TLV' }
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Replay the search
+        env:
+          WORKER_URL: https://kuda-worker.eligishvo.workers.dev
+          APP_TOKEN: ${{ secrets.APP_TOKEN }}
+          ORIGIN: ${{ inputs.origin }}
+          FROM: ${{ inputs.from }}
+          TO: ${{ inputs.to }}
+          MIN: ${{ inputs.min }}
+          MAX: ${{ inputs.max }}
+          BUDGET: ${{ inputs.budget }}
+          DEST: ${{ inputs.dest }}
+        run: node scripts/diagnose-search.mjs
