@@ -27,6 +27,7 @@ const build = (s: Search, selected: string[], ex = explore, es = estimates) =>
 describe('planning the calls', () => {
   it('asks Google once per month you could leave in, with the matching trip length', () => {
     expect(planCalls(search)).toEqual({
+      origin: 'TLV',
       explore: [{ month: 12, duration: 2 }],
       estimates: [{ from: '2026-12', to: '2026-12' }],
       // One-way fares are always asked for (free): two tickets often make a trip the round-trip lists miss

@@ -8,6 +8,11 @@ import { DatePair } from './flights';
 
 type Listener = (u: Usage) => void;
 
+/** A live check's question: always from the search's one departure airport, for the search's travelers. */
+export const flightQuery = (s: { departureAirport: string; adults: number }, dest: string, back: string, p: DatePair): FlightQuery => ({
+  origin: s.departureAirport, dest, back, out: p.out, ret: p.ret, adults: s.adults,
+});
+
 /** One lookup's name: same route, fly-back airport, dates and travelers = same answer. */
 export const flightKey = (q: FlightQuery) => [q.origin, q.dest, q.back && q.back !== q.dest ? q.back : q.dest, q.out, q.ret, q.adults ?? 1].join('|');
 

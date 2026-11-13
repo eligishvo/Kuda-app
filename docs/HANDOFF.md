@@ -39,7 +39,7 @@ Built in phase 2:
   with a fake store and a fake internet.
 
 Built in phase 2b:
-- `src/search/`: the search (`departureCc`, `departureAirports`, `earliestOut`, `latestRet`, `minNights`,
+- `src/search/`: the search (`departureCc`, `departureAirport` (one, since the QA fixes), `earliestOut`, `latestRet`, `minNights`,
   `maxNights`, `adults`, `budget`) with one function, `sanitizeSearch`, that repairs any invalid combination; it
   is saved on the phone and shared between screens through `SearchProvider` / `useSearch()`.
 - "Trip details" screen (`src/app/search.tsx`): departure country (searchable list) then its airports, a calendar
@@ -199,6 +199,13 @@ QA fixes 2026-11-13 (owner's QA brief, four findings; all automated tests use fa
   the one-way out/back months. Request limits and the Explore length bucket (from the asked length) are
   unchanged. Tests: Jan 20 – Feb 9 now fetches February departures; Mar 23 – Apr 18 now fetches March returns.
 
+- **4. One explicit departure airport.** `Search.departureAirports` (a list, sorted, so TLV + Ramon made ETM the
+  silent origin) became `departureAirport`: TLV by default, chosen on the Search screen as a single choice
+  ("Fly from"). Saved searches from older versions: TLV if it was in the list, otherwise the first valid saved
+  airport (`pickDeparture`). The map's departure ring and trip pill, the Search summary, the price search
+  (`planCalls(s).origin`) and live checks (`flightQuery`) all read the same field. Tests cover an old TLV + ETM
+  search and an explicit switch to ETM.
+
 ## How to test on a phone
 
 1. In the repo folder: `git pull`, `npm install`, `npx expo start`.
@@ -320,8 +327,9 @@ rings on the map should follow. Close and reopen the app: the search should stil
   book it, but Google's multi-city price (the live check) can differ.
 - **"Days" = nights between the two dates.** The owner said "5–8 days"; the calendar meaning is return date
   minus leave date.
-- **Several departure airports:** the search allows more than one, but prices are fetched from the first one
-  only (one origin per call; more would multiply the searches). Offered to the owner, no answer yet.
+- **One departure airport** (QA fix, 2026-11-13): the search used to allow several but sorted them and searched
+  only the first, so TLV + Ramon silently searched ETM. Now there is one, TLV by default, picked on the Search
+  screen; old saved lists keep TLV if it was in them. Several origins would multiply the searches.
 - **Country searches** (`arrival_area_id`) are not used: they need Google's id for each country and failed for
   some in the brief's tests. Results come from the "anywhere" call filtered to the selection, as the brief allows.
 - **While results show, map taps don't change the destinations** (only pins respond); "Destinations" goes back.
@@ -329,7 +337,7 @@ rings on the map should follow. Close and reopen the app: the search should stil
   destination screen, which runs the live checks.
 - **Opening a destination spends no searches** (QA fix, 2026-11-13; the brief had it check 3 dates on opening).
   Live checks and return lists are buttons that show their cost ("up to N searches").
-- **Live checks use the first departure airport and the search's number of travelers.**
+- **Live checks use the search's departure airport and number of travelers** (`flightQuery`).
 - **Calendar:** written in the app (`src/ui/Calendar.tsx`) instead of adding a date-picker library, so it follows
   the themes and needs no native code. Weeks start on Sunday.
 - **App token:** typed into the debug screen and kept on the phone, not stored in `app.json`, so it never reaches
@@ -362,6 +370,7 @@ None recorded yet (nothing has run on a phone).
 
 ## Changelog
 
+- **2026-11-13** — QA fix 4: one explicit departure airport (TLV default), old multi-airport searches migrated. 178 tests.
 - **2026-11-13** — QA fix 3: the request planner uses the shortest trip the flexibility allows. 175 tests.
 - **2026-11-13** — QA fix 2: map pins come from the list's options after the same rules; reasons for every
   airport that shows nothing. 174 tests.

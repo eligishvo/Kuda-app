@@ -9,7 +9,7 @@ const clean = (raw: unknown) => sanitizeSearch(raw, TODAY, airportCodesIn);
 describe('search: defaults', () => {
   it('starts from TLV, two weeks out, 5–9 nights, one traveler, the default budget', () => {
     expect(defaultSearch(TODAY)).toEqual({
-      departureCc: 'IL', departureAirports: ['TLV'], earliestOut: '2026-11-26', latestRet: '2027-01-11',
+      departureCc: 'IL', departureAirport: 'TLV', earliestOut: '2026-11-26', latestRet: '2027-01-11',
       minNights: 5, maxNights: 9, adults: 1, budget: DEFAULT_BUDGET, nonstopOnly: false, mixAirports: true, flexDays: 2,
     });
     expect(clean(null)).toEqual(defaultSearch(TODAY));
@@ -17,29 +17,37 @@ describe('search: defaults', () => {
   });
 
   it('writes the one-line summary', () => {
-    expect(summary(defaultSearch(TODAY))).toBe('TLV · 26 Nov – 11 Jan · 5–9 days (±2) · 1 adult · up to $400');
-    expect(summary({ ...defaultSearch(TODAY), minNights: 7, maxNights: 7, adults: 2, departureAirports: ['ETM', 'TLV'], flexDays: 0 })).toBe(
-      'ETM, TLV · 26 Nov – 11 Jan · 7 days · 2 adults · up to $400',
+    expect(summary(defaultSearch(TODAY))).toBe('From TLV · 26 Nov – 11 Jan · 5–9 days (±2) · 1 adult · up to $400');
+    expect(summary({ ...defaultSearch(TODAY), minNights: 7, maxNights: 7, adults: 2, departureAirport: 'ETM', flexDays: 0 })).toBe(
+      'From ETM · 26 Nov – 11 Jan · 7 days · 2 adults · up to $400',
     );
     expect(shortDate('2026-12-07')).toBe('7 Dec');
   });
 });
 
 describe('search: departure', () => {
-  it('keeps only airports that are in the chosen country, at least one', () => {
-    expect(clean({ departureCc: 'IL', departureAirports: ['TLV', 'ATH', 'ETM', 'ETM'] }).departureAirports).toEqual(['ETM', 'TLV']);
-    expect(clean({ departureCc: 'IL', departureAirports: [] }).departureAirports).toEqual(['TLV']);
+  it('an old saved search with TLV and Ramon keeps TLV (it used to search ETM silently)', () => {
+    expect(clean({ departureCc: 'IL', departureAirports: ['TLV', 'ETM'] }).departureAirport).toBe('TLV');
+    expect(clean({ departureCc: 'IL', departureAirports: ['ETM', 'TLV'] }).departureAirport).toBe('TLV');
+    // Without TLV: the first valid saved airport, shown as it is
+    expect(clean({ departureCc: 'IL', departureAirports: ['ATH', 'ETM'] }).departureAirport).toBe('ETM');
+    expect(clean({ departureCc: 'IL', departureAirports: [] }).departureAirport).toBe('TLV');
+    expect('departureAirports' in clean({ departureCc: 'IL', departureAirports: ['TLV', 'ETM'] })).toBe(false);
+  });
+
+  it('keeps an explicit choice of Ramon (ETM), and refuses an airport outside the country', () => {
+    expect(clean({ departureCc: 'IL', departureAirport: 'ETM' }).departureAirport).toBe('ETM');
+    expect(clean({ departureCc: 'IL', departureAirport: 'ATH' }).departureAirport).toBe('TLV');
   });
 
   it('picks an airport when the country changes', () => {
-    const s = clean({ departureCc: 'GR', departureAirports: [] });
+    const s = clean({ departureCc: 'GR', departureAirport: '' });
     expect(s.departureCc).toBe('GR');
-    expect(s.departureAirports).toHaveLength(1);
-    expect(airportCodesIn('GR')).toContain(s.departureAirports[0]);
+    expect(airportCodesIn('GR')).toContain(s.departureAirport);
   });
 
   it('falls back to Israel for a country without airports', () => {
-    expect(clean({ departureCc: 'ZZ', departureAirports: ['XXX'] })).toMatchObject({ departureCc: 'IL', departureAirports: ['TLV'] });
+    expect(clean({ departureCc: 'ZZ', departureAirport: 'XXX' })).toMatchObject({ departureCc: 'IL', departureAirport: 'TLV' });
   });
 
   it('offers named countries with airports, A to Z', () => {

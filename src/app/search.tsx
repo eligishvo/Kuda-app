@@ -37,12 +37,6 @@ export default function SearchScreen() {
   const country = countriesWithAirports().find((c) => c.cc === search.departureCc);
   const airports = airportsIn(search.departureCc);
 
-  const toggleAirport = (code: string) => {
-    const on = search.departureAirports.includes(code);
-    // At least one departure airport stays selected
-    if (on && search.departureAirports.length === 1) return;
-    change({ departureAirports: on ? search.departureAirports.filter((c) => c !== code) : [...search.departureAirports, code] });
-  };
 
   return (
     <ScrollView style={{ backgroundColor: t.background }} contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
@@ -73,8 +67,8 @@ export default function SearchScreen() {
               <Pressable
                 key={c.cc}
                 onPress={() => {
-                  // A new country starts with one of its large airports selected (the search rules pick it)
-                  change({ departureCc: c.cc, departureAirports: [] });
+                  // A new country starts from its default airport (the search rules pick it)
+                  change({ departureCc: c.cc, departureAirport: '' });
                   setPicking(false);
                   setFilter('');
                 }}
@@ -89,16 +83,16 @@ export default function SearchScreen() {
           </ScrollView>
         </View>
       )}
-      <Text style={[styles.small, { color: t.muted }]}>Airports to fly from (pick one or more):</Text>
+      <Text style={[styles.small, { color: t.muted }]}>Fly from (one airport; every price and live check uses it):</Text>
       <View style={styles.chips}>
         {airports.map((a) => {
-          const on = search.departureAirports.includes(a.code);
+          const on = search.departureAirport === a.code;
           return (
             <Pressable
               key={a.code}
-              onPress={() => toggleAirport(a.code)}
-              accessibilityRole="checkbox"
-              accessibilityState={{ checked: on }}
+              onPress={() => change({ departureAirport: a.code })}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: on }}
               style={[styles.chip, { backgroundColor: on ? t.accent : t.chip, borderColor: on ? t.accent : t.border }]}
             >
               <Text style={[styles.chipText, { color: on ? t.buttonText : t.text }]} numberOfLines={1}>{a.city || a.name} ({a.code})</Text>
@@ -164,7 +158,7 @@ export default function SearchScreen() {
       />
 
       <Summary theme={t} lines={[
-        `From ${search.departureAirports.map(airportLabel).join(', ')}`,
+        `From ${airportLabel(search.departureAirport)}`,
         `${shortDate(search.earliestOut)} – ${shortDate(search.latestRet)}, ${nightsText(search)}`,
         `${travelersText(search.adults)}, up to $${search.budget} each${search.adults > 1 ? ` ($${search.budget * search.adults} in total)` : ''}`,
         picked === 0 ? 'Destinations: anywhere (pick countries or airports on the map to narrow it)' : `Destinations: ${picked} ${picked === 1 ? 'country' : 'countries'} picked on the map`,

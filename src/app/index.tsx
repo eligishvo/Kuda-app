@@ -48,11 +48,11 @@ export default function Home() {
   }, [homeCc, selection, update]);
 
   const departures = useMemo(
-    () => search.departureAirports.flatMap((code) => {
-      const a = airportByCode(code);
+    () => {
+      const a = airportByCode(search.departureAirport);
       return a ? [a.lon, a.lat] : [];
-    }),
-    [search.departureAirports],
+    },
+    [search.departureAirport],
   );
 
   // What the map needs to colour countries and airports
@@ -78,8 +78,8 @@ export default function Home() {
 
   // Airports whose city name always shows on the map: the ones you fly from, the selected ones, the priced ones
   const named = useMemo(
-    () => new Set([...search.departureAirports, ...selectedAirports(selection, airportCodesIn), ...pins.map((p) => p.code), ...(previewCode ? [previewCode] : [])]),
-    [search.departureAirports, selection, pins, previewCode],
+    () => new Set([search.departureAirport, ...selectedAirports(selection, airportCodesIn), ...pins.map((p) => p.code), ...(previewCode ? [previewCode] : [])]),
+    [search.departureAirport, selection, pins, previewCode],
   );
   // Roughly how much of the screen the top bar and the bottom panel cover
   const covered = useMemo(() => ({ top: insets.top + 180, bottom: insets.bottom + (showResults ? 330 : 190) }), [insets.top, insets.bottom, showResults]);
@@ -160,7 +160,7 @@ export default function Home() {
             style={[styles.trip, { backgroundColor: t.panel, borderColor: t.border }]}
           >
             <Text style={[styles.tripMain, { color: t.text }]} numberOfLines={1}>
-              From {search.departureAirports.map(airportLabel).join(', ')}
+              From {airportLabel(search.departureAirport)}
             </Text>
             <Text style={[styles.tripSub, { color: t.muted }]} numberOfLines={1}>
               {shortDate(search.earliestOut)} – {shortDate(search.latestRet)} · {nightsText(search)}

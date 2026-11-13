@@ -2,7 +2,10 @@
 // to a fake SerpApi. Counts both the requests the app sends to the Worker and the searches sent to SerpApi.
 import { describe, expect, it } from 'vitest';
 import { Env, handle, Store } from '../worker/src/handler';
-import { allowanceText, costText, createLive, pairsToCheck, searchesLeft } from '../src/flights/live';
+import { allowanceText, costText, createLive, flightQuery, pairsToCheck, searchesLeft } from '../src/flights/live';
+import { airportCodesIn } from '../src/map/mapData';
+import { planCalls } from '../src/results/results';
+import { sanitizeSearch, summary } from '../src/search/search';
 import flights from './fixtures/flights.json';
 
 function fakeWorld(cap = '8') {
@@ -77,5 +80,25 @@ describe('live lookups: costs', () => {
     expect(costText(1)).toBe('up to 1 search');
     expect(costText(3)).toBe('up to 3 searches');
     expect(costText(0)).toBe('free (already loaded)');
+  });
+});
+
+describe('one departure airport everywhere (QA)', () => {
+  it('after switching to Ramon, the summary, the price search and the live check all use ETM', async () => {
+    const s = sanitizeSearch({ departureCc: 'IL', departureAirport: 'ETM' }, '2026-11-13', airportCodesIn);
+    expect(summary(s)).toMatch(/^From ETM · /);
+    expect(planCalls(s).origin).toBe('ETM');
+    const asked: string[] = [];
+    const phone = (async (url: string) => {
+      asked.push(url);
+      return { ok: true, status: 200, json: async () => ({ ok: true, data: [], cached: false, usage: { date: '2026-11-13', used: 1, cap: 8 } }) };
+    }) as unknown as typeof fetch;
+    await createLive(phone).checkFlights({ url: 'https://w.example', token: 't' }, flightQuery(s, 'ATH', 'ATH', { out: '2026-12-07', ret: '2026-12-14' }));
+    expect(new URL(asked[0]).searchParams.get('origin')).toBe('ETM');
+  });
+
+  it('an old saved search with TLV and ETM uses TLV for all of them', () => {
+    const s = sanitizeSearch({ departureCc: 'IL', departureAirports: ['TLV', 'ETM'] }, '2026-11-13', airportCodesIn);
+    expect([summary(s).slice(0, 8), planCalls(s).origin, flightQuery(s, 'ATH', 'ATH', { out: '2026-12-07', ret: '2026-12-14' }).origin]).toEqual(['From TLV', 'TLV', 'TLV']);
   });
 });

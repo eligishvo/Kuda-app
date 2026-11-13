@@ -22,7 +22,7 @@ type Shown = { title: string; line: string; ok: boolean; json: string };
 export default function Debug() {
   const t = useTheme();
   // Calls use the first departure airport of the current search
-  const DEPARTURE = { code: useSearch().search.departureAirports[0] };
+  const DEPARTURE = { code: useSearch().search.departureAirport };
   const [conn, setConn] = useState<Connection>({ url: DEFAULT_URL, token: '' });
   const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState('');

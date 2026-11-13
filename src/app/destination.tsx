@@ -13,7 +13,7 @@ import {
   airlinesText, arrivalDayShift, buildTrip, clock, compare, DatePair, datePairs, decodePairs, durationText, findAirports,
   nearest, returnsRange, returnsText, routeText, stopsLine,
 } from '../flights/flights';
-import { allowanceText, costText, live, pairsToCheck, searchesLeft } from '../flights/live';
+import { allowanceText, costText, flightQuery, live, pairsToCheck, searchesLeft } from '../flights/live';
 import { useAllowance } from '../flights/useAllowance';
 import { Airport, airportByCode, airportCodesIn, airportLabel, AIRPORTS } from '../map/mapData';
 import { useTrips } from '../planner/TripsContext';
@@ -50,7 +50,7 @@ export default function DestinationScreen() {
   const params = useLocalSearchParams<{ code?: string; pairs?: string; back?: string }>();
   const code = (params.code ?? '').toUpperCase();
   const airport = airportByCode(code);
-  const origin = search.departureAirports[0];
+  const origin = search.departureAirport;
   // The dates come from the map or the results list; opened without them, spread three across the window
   const [pairs] = useState<DatePair[]>(() => {
     const given = decodePairs(params.pairs);
@@ -75,7 +75,7 @@ export default function DestinationScreen() {
   const [busy, setBusy] = useState(false);
   const [showAll, setShowAll] = useState<Record<string, boolean>>({});
 
-  const queryOf = (from: string, p: DatePair): FlightQuery => ({ origin, dest: code, back: from, out: p.out, ret: p.ret, adults: search.adults });
+  const queryOf = (from: string, p: DatePair): FlightQuery => flightQuery(search, code, from, p);
 
   // On opening: only the saved connection is read (the allowance is read by useAllowance, also free)
   useEffect(() => {

@@ -46,6 +46,8 @@ export const MAX_EXPLORE_CALLS = 4;
 export const MAX_ESTIMATE_CALLS = 8;
 
 export type Plan = {
+  /** The departure airport every call uses (the search's one departure airport). */
+  origin: string;
   explore: { month: number; duration: 1 | 2 | 3 }[];
   estimates: { from: string; to: string }[];
   /** One-way fares to and from everywhere (free Travelpayouts calls). */
@@ -92,6 +94,7 @@ export function planCalls(s: Search, selected: string[] = []): Plan {
     .slice(0, MAX_ROUTE_AIRPORTS)
     .map((dest) => ({ dest, estimates: estimates.slice(0, 3), oneWays: oneWays.slice(0, 4) }));
   return {
+    origin: s.departureAirport,
     explore: months.slice(0, MAX_EXPLORE_CALLS).map((m) => ({ month: m.month, duration })),
     estimates: estimates.slice(0, MAX_ESTIMATE_CALLS),
     oneWays,

@@ -18,7 +18,7 @@ import {
 type Raw = { explore: Destination[][]; estimates: Destination[][]; outs: OneWay[][]; backs: OneWay[][]; key: string };
 
 /** Two searches with the same key need the same Worker calls (same origin, months, trip length, destinations). */
-const callsKey = (s: Search, selected: string[]) => JSON.stringify([s.departureAirports[0], planCalls(s, selected)]);
+const callsKey = (s: Search, selected: string[]) => JSON.stringify(planCalls(s, selected));
 
 /** Runs jobs a few at a time (the free calls), so a search with many airports doesn't take too long. */
 async function inBatches<T>(jobs: (() => Promise<T>)[], size: number): Promise<void> {
@@ -74,8 +74,8 @@ export function ResultsProvider({ children }: { children: ReactNode }) {
       return;
     }
     const plan = planCalls(search, selected);
-    // Prices are asked from the first departure airport, for one adult (so they are per person)
-    const origin = search.departureAirports[0];
+    // Prices are asked from the one departure airport, for one adult (so they are per person)
+    const origin = plan.origin;
     const explore: Destination[][] = [];
     const estimates: Destination[][] = [];
     const outs: OneWay[][] = [];

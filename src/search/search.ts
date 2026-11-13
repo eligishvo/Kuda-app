@@ -4,9 +4,12 @@ import { addDays, isDate, nightsBetween } from '../../shared/dates';
 import { DateText } from '../../shared/types';
 
 export type Search = {
-  /** Departure country and the airports in it to fly from (at least one). */
+  /**
+   * Departure country and the one airport in it that every price search and live check flies from
+   * (TLV unless you pick another, e.g. Ramon, ETM).
+   */
   departureCc: string;
-  departureAirports: string[];
+  departureAirport: string;
   earliestOut: DateText;
   latestRet: DateText;
   minNights: number;
@@ -41,7 +44,7 @@ const whole = (v: unknown, fallback: number) => (typeof v === 'number' && Number
 export function defaultSearch(today: DateText): Search {
   return {
     departureCc: 'IL',
-    departureAirports: ['TLV'],
+    departureAirport: 'TLV',
     earliestOut: addDays(today, 14),
     latestRet: addDays(today, 60),
     minNights: 5,
@@ -58,6 +61,19 @@ export function defaultSearch(today: DateText): Search {
  * Makes any search valid: used on what was saved on the phone (dates in the past move forward) and after
  * every change on the search screen. `airportsOf` lists the airport codes of a country.
  */
+/**
+ * The departure airport to use. A saved single airport wins if it is in the country. Searches saved by older
+ * versions held a list (sorted, so TLV + Ramon became ETM first and ETM was silently searched): TLV is kept if it
+ * was in the list, otherwise the first valid one. With nothing valid: TLV, or the country's first airport.
+ */
+export function pickDeparture(one: unknown, list: unknown, all: string[]): string {
+  if (typeof one === 'string' && all.includes(one)) return one;
+  const old = Array.isArray(list) ? list.filter((c): c is string => typeof c === 'string' && all.includes(c)) : [];
+  if (old.includes('TLV')) return 'TLV';
+  if (old.length > 0) return old[0];
+  return all.includes('TLV') ? 'TLV' : all[0];
+}
+
 export function sanitizeSearch(raw: unknown, today: DateText, airportsOf: (cc: string) => string[]): Search {
   const d = defaultSearch(today);
   const r = (raw && typeof raw === 'object' ? raw : {}) as Partial<Record<keyof Search, unknown>>;
@@ -67,10 +83,9 @@ export function sanitizeSearch(raw: unknown, today: DateText, airportsOf: (cc: s
   if (all.length === 0) {
     // The map data has no airports for the default either (only in tests): keep the default as is
     departureCc = d.departureCc;
-    all = d.departureAirports;
+    all = [d.departureAirport];
   }
-  const asked = Array.isArray(r.departureAirports) ? r.departureAirports.filter((c): c is string => typeof c === 'string' && all.includes(c)) : [];
-  const departureAirports = asked.length > 0 ? [...new Set(asked)].sort() : [all.includes('TLV') ? 'TLV' : all[0]];
+  const departureAirport = pickDeparture(r.departureAirport, (r as { departureAirports?: unknown }).departureAirports, all);
 
   let minNights = clamp(whole(r.minNights, d.minNights), LIMITS.nights.min, LIMITS.nights.max);
   let maxNights = clamp(whole(r.maxNights, d.maxNights), LIMITS.nights.min, LIMITS.nights.max);
@@ -87,7 +102,7 @@ export function sanitizeSearch(raw: unknown, today: DateText, airportsOf: (cc: s
 
   return {
     departureCc,
-    departureAirports,
+    departureAirport,
     earliestOut,
     latestRet,
     minNights,
@@ -129,10 +144,10 @@ export function lengthNote(days: number, s: Search): string {
 }
 export const travelersText = (n: number) => (n === 1 ? '1 adult' : `${n} adults`);
 
-/** The one-line summary shown on the map, e.g. "TLV · 26 Nov – 11 Jan · 5–9 days (±2) · 1 adult · up to $400". */
+/** The one-line summary shown on the map, e.g. "From TLV · 26 Nov – 11 Jan · 5–9 days (±2) · 1 adult · up to $400". */
 export function summary(s: Search): string {
   return [
-    s.departureAirports.join(', '),
+    `From ${s.departureAirport}`,
     `${shortDate(s.earliestOut)} – ${shortDate(s.latestRet)}`,
     nightsText(s),
     travelersText(s.adults),
