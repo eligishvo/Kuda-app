@@ -161,8 +161,11 @@ Added 2026-11-13: **flexible trip length** (owner chose "option 1" of three ways
   `lengthRange(s)` is the widened range used by `windowOf`, the list's length filter and the no-fit list.
 - Results lines outside the asked range show their length highlighted with "1 day longer than asked" etc.
 - Changing it re-filters what was fetched; no new searches.
-- The other two options offered, not started: a paid SerpApi plan so Search can check selected airports live
-  ($25/month for 1,000 searches), and testing Duffel as a free live source.
+- The other two options, **on hold by the owner (2026-11-13)**: a paid SerpApi plan so Search can check selected
+  airports live ($25/month for 1,000 searches), and Duffel as a free live source. Duffel's services agreement
+  forbids use "for metasearch purposes" (2.5(d)) and grants use "solely for your business operations" (1.1),
+  which a personal price-comparison app may not fit; the suggestion was to ask help@duffel.com first. The
+  "Test Duffel" workflow and `scripts/test-duffel.mjs` are ready but no `DUFFEL_TOKEN` secret exists.
 
 ## How to test on a phone
 
@@ -327,6 +330,7 @@ None recorded yet (nothing has run on a phone).
 
 ## Changelog
 
+- **2026-11-13** — Duffel and a paid SerpApi plan put on hold by the owner; Test Duffel workflow kept.
 - **2026-11-13** — Flexible trip length (±N days, default ±2). 165 tests. Published as an update.
 - **2026-11-13** — Search coverage fix after a real search found one result: same-airport two-ticket trips,
   per-airport free calls, "Nothing that fits" list with reasons, Diagnose search workflow. 159 tests.
