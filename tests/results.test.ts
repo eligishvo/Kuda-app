@@ -62,6 +62,24 @@ describe('planning the calls', () => {
     expect(planCalls(search, many).routes).toHaveLength(15);
   });
 
+  it('fetches the months a shorter trip allowed by the flexibility needs (QA)', () => {
+    // 10–14 days ±2 accepts an 8-day trip
+    const flex = { ...search, minNights: 10, maxNights: 14, flexDays: 2 };
+    // Jan 20 – Feb 9: leaving on 1 Feb for 8 days fits, so February departures are fetched
+    const feb = planCalls({ ...flex, earliestOut: '2027-01-20', latestRet: '2027-02-09' });
+    expect(feb.explore.map((e) => e.month)).toEqual([1, 2]);
+    expect(feb.oneWays).toContainEqual({ month: '2027-02', dir: 'out' });
+    expect(feb.estimates).toContainEqual({ from: '2027-02', to: '2027-02' });
+    // Without the flexibility the last departure is 30 Jan, so February isn't needed
+    expect(planCalls({ ...flex, flexDays: 0, earliestOut: '2027-01-20', latestRet: '2027-02-09' }).explore.map((e) => e.month)).toEqual([1]);
+    // Mar 23 – Apr 18: 23 → 31 Mar is a valid 8-day trip, so March returns are fetched
+    const mar = planCalls({ ...flex, earliestOut: '2027-03-23', latestRet: '2027-04-18' });
+    expect(mar.oneWays).toContainEqual({ month: '2027-03', dir: 'back' });
+    expect(planCalls({ ...flex, flexDays: 0, earliestOut: '2027-03-23', latestRet: '2027-04-18' }).oneWays).not.toContainEqual({ month: '2027-03', dir: 'back' });
+    // The Google Explore length bucket still follows the asked length (10–14 = two weeks)
+    expect(mar.explore.every((e) => e.duration === 3)).toBe(true);
+  });
+
   it('never plans more than four Google searches', () => {
     const p = planCalls({ ...search, earliestOut: '2026-12-01', latestRet: '2027-05-30', minNights: 10, maxNights: 16 });
     expect(p.explore).toHaveLength(4);

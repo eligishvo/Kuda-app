@@ -66,7 +66,10 @@ export const MAX_ROUTE_AIRPORTS = 15;
  * Travelpayouts (free) once per month, plus once for trips that leave in one month and return in the next.
  */
 export function planCalls(s: Search, selected: string[] = []): Plan {
-  const lastOut = addDays(s.latestRet, -s.minNights);
+  // The shortest trip the results accept (the asked minimum minus the flexibility) decides how late you could
+  // still leave and how early you could already be back, so no month a fitting trip needs is left out
+  const shortest = lengthRange(s).min;
+  const lastOut = addDays(s.latestRet, -shortest);
   const months = monthsInWindow(s.earliestOut, lastOut < s.earliestOut ? s.earliestOut : lastOut);
   const duration = durationBucket(s.minNights, s.maxNights);
   const ym = (m: { year: number; month: number }) => `${m.year}-${String(m.month).padStart(2, '0')}`;
@@ -77,7 +80,7 @@ export function planCalls(s: Search, selected: string[] = []): Plan {
     if (next) estimates.push({ from: ym(m), to: ym(next) });
   });
   // One-way fares: the months you could leave in, and the months you could come back in
-  const firstBack = addDays(s.earliestOut, s.minNights);
+  const firstBack = addDays(s.earliestOut, shortest);
   const backMonths = monthsInWindow(firstBack > s.latestRet ? s.latestRet : firstBack, s.latestRet);
   // Always fetched: two one-way tickets often make a trip the round-trip lists don't have
   const oneWays: Plan['oneWays'] = [

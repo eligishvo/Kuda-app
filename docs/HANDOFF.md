@@ -193,6 +193,12 @@ QA fixes 2026-11-13 (owner's QA brief, four findings; all automated tests use fa
   rule left out (`emptyListText`). The map panel's "N more over $X" became "2 more over $400 · 1 only with
   stops". Regression tests for both QA cases are in `tests/results.test.ts`.
 
+- **3. The months fetched follow the trip-length flexibility.** `planCalls` used the asked minimum (10 days) to
+  work out the latest departure and the earliest return, while the results accept the widened minimum (8 days
+  with ±2). It now uses `lengthRange(s).min` for both, for the round-trip estimates, Google Explore months and
+  the one-way out/back months. Request limits and the Explore length bucket (from the asked length) are
+  unchanged. Tests: Jan 20 – Feb 9 now fetches February departures; Mar 23 – Apr 18 now fetches March returns.
+
 ## How to test on a phone
 
 1. In the repo folder: `git pull`, `npm install`, `npx expo start`.
@@ -356,6 +362,7 @@ None recorded yet (nothing has run on a phone).
 
 ## Changelog
 
+- **2026-11-13** — QA fix 3: the request planner uses the shortest trip the flexibility allows. 175 tests.
 - **2026-11-13** — QA fix 2: map pins come from the list's options after the same rules; reasons for every
   airport that shows nothing. 174 tests.
 - **2026-11-13** — QA fix 1: opening a destination is free; live checks and returns only on a tap that shows
