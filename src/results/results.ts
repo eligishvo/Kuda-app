@@ -3,7 +3,7 @@
 // Plain functions (no React, no network) so the rules are easy to test.
 import { addDays, durationBucket, fitsWindow, monthsInWindow, nightsBetween, Window } from '../../shared/dates';
 import { Destination, OneWay, PriceEstimate } from '../../shared/types';
-import { Search, shortDate } from '../search/search';
+import { lengthRange, Search, shortDate } from '../search/search';
 
 /** live = Google's price; estimate / rough = older Travelpayouts fares; none = nothing for these dates. */
 export type ResultKind = 'live' | 'estimate' | 'rough' | 'none';
@@ -84,7 +84,11 @@ export function planCalls(s: Search, selected: string[] = []): Plan {
   };
 }
 
-export const windowOf = (s: Search): Window => ({ earliestOut: s.earliestOut, latestRet: s.latestRet, minNights: s.minNights, maxNights: s.maxNights });
+/** The dates and trip lengths that count, with the length widened by the search's flexibility. */
+export function windowOf(s: Search): Window {
+  const { min, max } = lengthRange(s);
+  return { earliestOut: s.earliestOut, latestRet: s.latestRet, minNights: min, maxNights: max };
+}
 
 /** Connecting Travelpayouts fares are the least trustworthy, so anything else is preferred to them. */
 const trust = (d: Destination) => (d.estimate.confidence === 'rough' ? 1 : 0);
@@ -305,7 +309,7 @@ export type Filters = {
 };
 
 export const defaultFilters = (s: Search): Filters => ({
-  maxPrice: s.budget, minDays: s.minNights, maxDays: s.maxNights, nonstopOnly: s.nonstopOnly, liveOnly: false, mixed: s.mixAirports, sort: 'price',
+  maxPrice: s.budget, minDays: lengthRange(s).min, maxDays: lengthRange(s).max, nonstopOnly: s.nonstopOnly, liveOnly: false, mixed: s.mixAirports, sort: 'price',
 });
 
 /** Applies the results screen's filters and sorting. */
@@ -459,16 +463,18 @@ export type Missing = {
 
 /** How far a trip is from fitting the search, in days (0 = it fits). */
 function missBy(e: PriceEstimate, s: Search): number {
+  const { min, max } = lengthRange(s);
   const early = Math.max(0, nightsBetween(e.outDate, s.earliestOut));
   const late = Math.max(0, nightsBetween(s.latestRet, e.retDate));
-  const short = Math.max(0, s.minNights - e.nights);
-  const long = Math.max(0, e.nights - s.maxNights);
+  const short = Math.max(0, min - e.nights);
+  const long = Math.max(0, e.nights - max);
   return early + late + short + long;
 }
 
 function whyMissed(e: PriceEstimate, s: Search): string {
   const parts: string[] = [];
-  if (e.nights < s.minNights || e.nights > s.maxNights) parts.push(`${e.nights} days`);
+  const { min, max } = lengthRange(s);
+  if (e.nights < min || e.nights > max) parts.push(`${e.nights} days`);
   if (e.outDate < s.earliestOut) parts.push(`leaves ${shortDate(e.outDate)}`);
   if (e.retDate > s.latestRet) parts.push(`back ${shortDate(e.retDate)}`);
   return parts.join(', ');

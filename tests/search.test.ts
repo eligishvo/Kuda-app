@@ -10,15 +10,15 @@ describe('search: defaults', () => {
   it('starts from TLV, two weeks out, 5–9 nights, one traveler, the default budget', () => {
     expect(defaultSearch(TODAY)).toEqual({
       departureCc: 'IL', departureAirports: ['TLV'], earliestOut: '2026-11-26', latestRet: '2027-01-11',
-      minNights: 5, maxNights: 9, adults: 1, budget: DEFAULT_BUDGET, nonstopOnly: false, mixAirports: true,
+      minNights: 5, maxNights: 9, adults: 1, budget: DEFAULT_BUDGET, nonstopOnly: false, mixAirports: true, flexDays: 2,
     });
     expect(clean(null)).toEqual(defaultSearch(TODAY));
     expect(clean('nonsense')).toEqual(defaultSearch(TODAY));
   });
 
   it('writes the one-line summary', () => {
-    expect(summary(defaultSearch(TODAY))).toBe('TLV · 26 Nov – 11 Jan · 5–9 days · 1 adult · up to $400');
-    expect(summary({ ...defaultSearch(TODAY), minNights: 7, maxNights: 7, adults: 2, departureAirports: ['ETM', 'TLV'] })).toBe(
+    expect(summary(defaultSearch(TODAY))).toBe('TLV · 26 Nov – 11 Jan · 5–9 days (±2) · 1 adult · up to $400');
+    expect(summary({ ...defaultSearch(TODAY), minNights: 7, maxNights: 7, adults: 2, departureAirports: ['ETM', 'TLV'], flexDays: 0 })).toBe(
       'ETM, TLV · 26 Nov – 11 Jan · 7 days · 2 adults · up to $400',
     );
     expect(shortDate('2026-12-07')).toBe('7 Dec');
@@ -75,6 +75,7 @@ describe('search: dates and numbers', () => {
     expect(clean({ minNights: 0, maxNights: 99, adults: 0, budget: 5 })).toMatchObject({ minNights: 1, maxNights: 30, adults: 1, budget: 50 });
     expect(clean({ adults: 20, budget: 99999 })).toMatchObject({ adults: 9, budget: 5000 });
     expect(clean({ adults: 2.4, budget: 'lots' })).toMatchObject({ adults: 2, budget: DEFAULT_BUDGET });
+    expect([clean({ flexDays: -1 }).flexDays, clean({ flexDays: 9 }).flexDays, clean({ flexDays: 'x' }).flexDays]).toEqual([0, 5, 2]);
   });
 
   it('cleaning twice changes nothing', () => {

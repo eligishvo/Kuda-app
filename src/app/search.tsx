@@ -6,7 +6,7 @@ import { Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from
 import { addDays } from '../../shared/dates';
 import { airportLabel, airportsIn, countriesWithAirports } from '../map/mapData';
 import { useResults } from '../results/useResults';
-import { daysText, LIMITS, nightsText, shortDate, travelersText } from '../search/search';
+import { daysText, lengthRange, LIMITS, nightsText, shortDate, travelersText } from '../search/search';
 import { useSelection } from '../selection/useSelection';
 import { useSearch } from '../search/SearchContext';
 import { useTheme } from '../theme/ThemeContext';
@@ -119,7 +119,21 @@ export default function SearchScreen() {
       <Text style={[styles.heading, { color: t.text }]}>Trip length</Text>
       <Stepper theme={t} label="Shortest" value={search.minNights} text={daysText(search.minNights)} min={LIMITS.nights.min} max={search.maxNights} onChange={(minNights) => change({ minNights })} />
       <Stepper theme={t} label="Longest" value={search.maxNights} text={daysText(search.maxNights)} min={search.minNights} max={LIMITS.nights.max} onChange={(maxNights) => change({ maxNights })} />
-      <Text style={[styles.small, { color: t.muted }]}>Counted from the day you leave to the day you come back: 7 → 14 December is 7 days.</Text>
+      <Stepper
+        theme={t}
+        label="Flexible by"
+        value={search.flexDays}
+        text={search.flexDays === 0 ? 'exact' : `± ${daysText(search.flexDays)}`}
+        min={0}
+        max={LIMITS.flex.max}
+        onChange={(flexDays) => change({ flexDays })}
+      />
+      <Text style={[styles.small, { color: t.muted }]}>
+        Counted from the day you leave to the day you come back: 7 → 14 December is 7 days.
+        {search.flexDays > 0
+          ? ` Trips of ${lengthRange(search).min}–${lengthRange(search).max} days are shown; the ones outside ${search.minNights}–${search.maxNights} are marked.`
+          : ''}
+      </Text>
 
       <Text style={[styles.heading, { color: t.text }]}>Budget</Text>
       <Stepper

@@ -7,7 +7,7 @@ import {
   asDestinations, buildMixed, buildOptions, buildResults, buildSameAirport, defaultFilters, filterOptions, mergeOptions, missingDestinations, originOf, planCalls,
   priceText, stopsText, totalCost,
 } from '../src/results/results';
-import { defaultSearch, Search } from '../src/search/search';
+import { defaultSearch, lengthNote, lengthRange, Search } from '../src/search/search';
 import { normalizeExplore, normalizeOneWays, normalizeTravelpayouts } from '../shared/normalize';
 import { Destination } from '../shared/types';
 import exploreRaw from './fixtures/explore.json';
@@ -16,7 +16,8 @@ import onewaysOutRaw from './fixtures/oneways-out.json';
 import travelpayoutsRaw from './fixtures/travelpayouts.json';
 
 // 5–9 nights between 5 and 20 December, up to $400
-const search: Search = { ...defaultSearch('2026-11-12'), earliestOut: '2026-12-05', latestRet: '2026-12-20', budget: 400 };
+// Exact trip length (no flexibility) unless a test says otherwise
+const search: Search = { ...defaultSearch('2026-11-12'), earliestOut: '2026-12-05', latestRet: '2026-12-20', budget: 400, flexDays: 0 };
 const explore = [normalizeExplore(exploreRaw)]; // FCO $97 (10–16), ATH $142 (7–14), LGW $268 (2–9: too early)
 const estimates = [normalizeTravelpayouts(travelpayoutsRaw)]; // LCA ~$61 (3 nights), BUD ~$110 (8–14), LIS $310 rough (11–20)
 const build = (s: Search, selected: string[], ex = explore, es = estimates) => buildResults(s, selected, ex, es, airportByCode);
@@ -267,6 +268,45 @@ describe('selected airports with nothing that fits', () => {
 
   it('is empty when nothing was selected', () => {
     expect(missingDestinations(march, [], lists, [], airportByCode)).toEqual([]);
+  });
+});
+
+describe('flexible trip length', () => {
+  // The real March search: Google's Vienna trip is 16 days, Amsterdam 15, Rome 13
+  const march = { ...search, earliestOut: '2027-03-01', latestRet: '2027-04-10', minNights: 10, maxNights: 14 };
+  const est = (airport: string, outDate: string, retDate: string, price: number) => ({
+    airport, city: airport, estimate: { source: 'explore' as const, confidence: 'live' as const, price, outDate, retDate, nights: Math.round((Date.parse(retDate) - Date.parse(outDate)) / 86400000), stops: 0 },
+  });
+  const lists = [[est('VIE', '2027-03-21', '2027-04-06', 294), est('AMS', '2027-03-20', '2027-04-04', 411), est('FCO', '2027-03-05', '2027-03-18', 124), est('ATH', '2027-03-01', '2027-03-08', 99)]];
+  const codes = (s: Search) => buildOptions(s, [], lists, [], airportByCode).map((o) => o.airport).sort();
+
+  it('exact: only trips of 10–14 days', () => {
+    expect(codes(march)).toEqual(['FCO']);
+  });
+
+  it('±2 days also lets in the 15- and 16-day trips; ±3 the 7-day one', () => {
+    expect(codes({ ...march, flexDays: 2 })).toEqual(['AMS', 'FCO', 'VIE']);
+    expect(codes({ ...march, flexDays: 3 })).toEqual(['AMS', 'ATH', 'FCO', 'VIE']);
+  });
+
+  it('starts the list’s length filter from the widened range', () => {
+    expect(defaultFilters({ ...march, flexDays: 2 })).toMatchObject({ minDays: 8, maxDays: 16 });
+  });
+
+  it('says how far a trip is from the asked length', () => {
+    expect([lengthNote(16, march), lengthNote(15, march), lengthNote(12, march), lengthNote(8, march)]).toEqual([
+      '2 days longer than asked', '1 day longer than asked', '', '2 days shorter than asked',
+    ]);
+  });
+
+  it('counts the flexibility when explaining what didn’t fit', () => {
+    const m = missingDestinations({ ...march, flexDays: 1 }, ['VIE'], lists, [], airportByCode);
+    expect(m[0].near?.why).toBe('16 days');
+    expect(missingDestinations({ ...march, flexDays: 2 }, ['VIE'], lists, buildOptions({ ...march, flexDays: 2 }, ['VIE'], lists, [], airportByCode), airportByCode)).toEqual([]);
+  });
+
+  it('never goes below one day', () => {
+    expect(lengthRange({ ...march, minNights: 2, maxNights: 3, flexDays: 5 })).toEqual({ min: 1, max: 8 });
   });
 });
 

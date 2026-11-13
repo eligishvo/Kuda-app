@@ -7,7 +7,7 @@ import { FlatList, Pressable, StyleSheet, Switch, Text, View } from 'react-nativ
 import { encodePairs } from '../flights/flights';
 import { defaultFilters, filterOptions, Filters, Option, originOf, priceText, Sort, stopsText, totalCost } from '../results/results';
 import { useResults } from '../results/useResults';
-import { daysText, LIMITS, shortDate, travelersText } from '../search/search';
+import { daysText, lengthNote, lengthRange, LIMITS, Search, shortDate, travelersText } from '../search/search';
 import { useSearch } from '../search/SearchContext';
 import { useTheme } from '../theme/ThemeContext';
 import { FONTS, Theme, TOUCH } from '../theme/themes';
@@ -114,8 +114,8 @@ export default function ResultsScreen() {
       {showFilters && (
         <View style={[styles.filters, { backgroundColor: t.panel, borderColor: t.border }]}>
           <Stepper theme={t} label="Most per person" value={filters.maxPrice} text={`$${filters.maxPrice}`} min={LIMITS.budget.min} max={LIMITS.budget.max} step={LIMITS.budget.step} onChange={(maxPrice) => set({ maxPrice })} />
-          <Stepper theme={t} label="Shortest trip" value={filters.minDays} text={daysText(filters.minDays)} min={search.minNights} max={filters.maxDays} onChange={(minDays) => set({ minDays })} />
-          <Stepper theme={t} label="Longest trip" value={filters.maxDays} text={daysText(filters.maxDays)} min={filters.minDays} max={search.maxNights} onChange={(maxDays) => set({ maxDays })} />
+          <Stepper theme={t} label="Shortest trip" value={filters.minDays} text={daysText(filters.minDays)} min={lengthRange(search).min} max={filters.maxDays} onChange={(minDays) => set({ minDays })} />
+          <Stepper theme={t} label="Longest trip" value={filters.maxDays} text={daysText(filters.maxDays)} min={filters.minDays} max={lengthRange(search).max} onChange={(maxDays) => set({ maxDays })} />
           <Toggle theme={t} label="Nonstop only" value={filters.nonstopOnly} onChange={(nonstopOnly) => set({ nonstopOnly })} />
           <Toggle theme={t} label="Google prices only (no estimates)" value={filters.liveOnly} onChange={(liveOnly) => set({ liveOnly })} />
           <Toggle
@@ -149,15 +149,18 @@ export default function ResultsScreen() {
       keyExtractor={(o) => `${o.airport}_${o.back?.airport ?? ''}_${o.estimate.outDate}_${o.estimate.retDate}`}
       ListHeaderComponent={header}
       ListFooterComponent={footer || undefined}
-      renderItem={({ item }) => <Row theme={t} o={item} adults={search.adults} onPress={() => open(item)} />}
+      renderItem={({ item }) => <Row theme={t} o={item} search={search} onPress={() => open(item)} />}
       initialNumToRender={12}
     />
   );
 }
 
 /** One option: where, when you leave and come back (with times when known), how long, and what it costs. */
-function Row({ theme: t, o, adults, onPress }: { theme: Theme; o: Option; adults: number; onPress: () => void }) {
+function Row({ theme: t, o, search, onPress }: { theme: Theme; o: Option; search: Search; onPress: () => void }) {
   const e = o.estimate;
+  const adults = search.adults;
+  // Trips the flexibility let in are marked, e.g. "1 day longer than asked"
+  const off = lengthNote(e.nights, search);
   return (
     <Pressable onPress={onPress} accessibilityRole="button" style={[styles.row, { backgroundColor: t.panel, borderColor: t.border }]}>
       <View style={styles.flex}>
@@ -172,7 +175,8 @@ function Row({ theme: t, o, adults, onPress }: { theme: Theme; o: Option; adults
           <When theme={t} label="Return" date={e.retDate} time={e.retTime} />
           <View>
             <Text style={[styles.tiny, { color: t.muted }]}>Trip</Text>
-            <Text style={[styles.when, { color: t.text }]}>{daysText(e.nights)}</Text>
+            <Text style={[styles.when, { color: off ? t.price : t.text }]}>{daysText(e.nights)}</Text>
+            {off ? <Text style={[styles.tiny, { color: t.price }]}>{off}</Text> : null}
           </View>
         </View>
         <View style={styles.meta}>

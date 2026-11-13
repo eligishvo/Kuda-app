@@ -18,14 +18,19 @@ export type Search = {
   nonstopOnly: boolean;
   /** Also offer trips that fly into one airport and home from another. */
   mixAirports: boolean;
+  /** Also show trips up to this many days shorter or longer than asked (0 = exactly as asked). */
+  flexDays: number;
 };
 
 /** The one place to change the starting budget. */
 export const DEFAULT_BUDGET = 400;
+/** Trip length flexibility to start with: ±2 days. */
+export const DEFAULT_FLEX = 2;
 export const LIMITS = {
   nights: { min: 1, max: 30 },
   adults: { min: 1, max: 9 },
   budget: { min: 50, max: 5000, step: 25 },
+  flex: { max: 5 },
   /** Google Explore only has prices for about the next six months. */
   horizonDays: 180,
 };
@@ -45,6 +50,7 @@ export function defaultSearch(today: DateText): Search {
     budget: DEFAULT_BUDGET,
     nonstopOnly: false,
     mixAirports: true,
+    flexDays: DEFAULT_FLEX,
   };
 }
 
@@ -90,6 +96,7 @@ export function sanitizeSearch(raw: unknown, today: DateText, airportsOf: (cc: s
     budget: clamp(whole(r.budget, d.budget), LIMITS.budget.min, LIMITS.budget.max),
     nonstopOnly: r.nonstopOnly === true,
     mixAirports: r.mixAirports !== false,
+    flexDays: clamp(whole(r.flexDays, d.flexDays), 0, LIMITS.flex.max),
   };
 }
 
@@ -106,10 +113,23 @@ export function shortDate(d: DateText): string {
  * a 7-day trip (the code calls these nights, the screens say days).
  */
 export const daysText = (n: number) => (n === 1 ? '1 day' : `${n} days`);
-export const nightsText = (s: Search) => (s.minNights === s.maxNights ? daysText(s.minNights) : `${s.minNights}–${s.maxNights} days`);
+export const nightsText = (s: Search) =>
+  `${s.minNights === s.maxNights ? daysText(s.minNights) : `${s.minNights}–${s.maxNights} days`}${s.flexDays > 0 ? ` (±${s.flexDays})` : ''}`;
+
+/** The trip lengths that are shown: the asked range widened by the flexibility (never below 1 day). */
+export const lengthRange = (s: Search) => ({ min: Math.max(1, s.minNights - s.flexDays), max: s.maxNights + s.flexDays });
+
+/** For a trip outside the asked length: "1 day longer than asked", "2 days shorter than asked"; else ''. */
+export function lengthNote(days: number, s: Search): string {
+  const over = days - s.maxNights;
+  const under = s.minNights - days;
+  if (over > 0) return `${daysText(over)} longer than asked`;
+  if (under > 0) return `${daysText(under)} shorter than asked`;
+  return '';
+}
 export const travelersText = (n: number) => (n === 1 ? '1 adult' : `${n} adults`);
 
-/** The one-line summary shown on the map, e.g. "TLV · 26 Nov – 11 Jan · 5–9 days · 1 adult · up to $400". */
+/** The one-line summary shown on the map, e.g. "TLV · 26 Nov – 11 Jan · 5–9 days (±2) · 1 adult · up to $400". */
 export function summary(s: Search): string {
   return [
     s.departureAirports.join(', '),

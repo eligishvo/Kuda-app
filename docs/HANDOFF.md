@@ -156,6 +156,14 @@ price at all. Changes:
 - `scripts/diagnose-search.mjs` + `.github/workflows/diagnose-search.yml`: replay a search and print every price
   with the reason it was kept or dropped. Replaying within 12 hours of the app's search costs no searches.
 
+Added 2026-11-13: **flexible trip length** (owner chose "option 1" of three ways to find more trips):
+- Search screen → Trip length → "Flexible by" (exact, ±1 … ±5 days; default ±2). `Search.flexDays`;
+  `lengthRange(s)` is the widened range used by `windowOf`, the list's length filter and the no-fit list.
+- Results lines outside the asked range show their length highlighted with "1 day longer than asked" etc.
+- Changing it re-filters what was fetched; no new searches.
+- The other two options offered, not started: a paid SerpApi plan so Search can check selected airports live
+  ($25/month for 1,000 searches), and testing Duffel as a free live source.
+
 ## How to test on a phone
 
 1. In the repo folder: `git pull`, `npm install`, `npx expo start`.
@@ -296,6 +304,9 @@ rings on the map should follow. Close and reopen the app: the search should stil
 - **Travelpayouts picks one fare per airport:** nonstop before connecting, then the cheapest. Filtering by the
   user's window happens in the app (phase 3), so a fare outside the window can hide one inside it; if that shows
   up in practice, move the window into the `/estimates` call.
+- **Daily cap vs the SerpApi plan:** the Worker allows 40 searches a day (`DAILY_SEARCH_CAP`), but the free
+  plan has 250 a month (about 8 a day), so heavy use can run out mid-month. Raised with the owner on
+  2026-11-13; not changed yet.
 - **The cap counts searches sent**, including ones SerpApi answers with an error. It is kept in KV, which is not
   exact under simultaneous calls; with one user that is fine.
 - **Brief corrected:** repo name `eligishvo/Kuda` → `eligishvo/Kuda-app` (the real repo). No decision changed.
@@ -316,6 +327,7 @@ None recorded yet (nothing has run on a phone).
 
 ## Changelog
 
+- **2026-11-13** — Flexible trip length (±N days, default ±2). 165 tests. Published as an update.
 - **2026-11-13** — Search coverage fix after a real search found one result: same-airport two-ticket trips,
   per-airport free calls, "Nothing that fits" list with reasons, Diagnose search workflow. 159 tests.
 - **2026-11-13** — Return flights counted per outbound flight and per date option on the destination screen;
