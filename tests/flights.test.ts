@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   airlinesText, arrivalDayShift, buildTrip, clock, compare, datePairs, decodePairs, distanceKm, durationText, encodePairs,
-  findAirports, nearest, routeText, sanitizeTrip, stopsLine, suggestedPairs,
+  findAirports, nearest, returnsRange, returnsText, routeText, sanitizeTrip, stopsLine, suggestedPairs,
 } from '../src/flights/flights';
 import { airportByCode, AIRPORTS, airportsIn } from '../src/map/mapData';
 import { fitsWindow } from '../shared/dates';
@@ -67,6 +67,20 @@ describe('describing flights', () => {
   it('compares a list by price, time and stops', () => {
     expect(compare([direct, viaLarnaca])).toEqual({ count: 2, cheapest: 118, fastestMin: 135, fewestStops: 0 });
     expect(compare([])).toEqual({ count: 0, cheapest: null, fastestMin: null, fewestStops: null });
+  });
+});
+
+describe('counting return flights', () => {
+  it('says how many go with one outbound flight', () => {
+    expect([returnsText(0), returnsText(1), returnsText(7)]).toEqual(['No return flights', '1 return flight', '7 return flights']);
+  });
+
+  it('sums up a date option from the outbound flights counted so far', () => {
+    expect(returnsRange([])).toBe('');
+    expect(returnsRange([6])).toBe('6 return flights');
+    expect(returnsRange([6, 6, 6])).toBe('6 return flights');
+    expect(returnsRange([7, 3, 5])).toBe('3–7 return flights');
+    expect(returnsRange([0, 4])).toBe('0–4 return flights');
   });
 });
 

@@ -61,7 +61,7 @@ export function ResultsSheet({ theme: t, results, loading, progress, error, usag
         <Text style={[styles.note, { color: t.muted }]}>Nothing fits these dates and budget. Try a wider window or a higher budget.</Text>
       )}
       {!loading && list.length > 0 && (
-        <Text style={[styles.note, { color: t.muted }]}>Tap a destination, then "Compare flights" for live times and prices (uses about 3 searches).</Text>
+        <Text style={[styles.note, { color: t.muted }]}>Tap a destination, then "Compare flights" for live times and prices (uses about 6 searches: 3 dates, plus counting returns for each).</Text>
       )}
       <ScrollView style={styles.list}>
         {list.map((r) => {

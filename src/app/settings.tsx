@@ -2,9 +2,11 @@
 import Constants from 'expo-constants';
 import { router } from 'expo-router';
 import * as Updates from 'expo-updates';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { LIMITS as TRIP_LIMITS } from '../search/search';
 import { useSearch } from '../search/SearchContext';
+import { KEYS, load, save } from '../storage/store';
 import { useSetTheme, useTheme } from '../theme/ThemeContext';
 import { FONTS, Theme, THEME_IDS, THEMES, TOUCH } from '../theme/themes';
 import { Stepper } from '../ui/Stepper';
@@ -15,6 +17,10 @@ export default function Settings() {
   const t = useTheme();
   const setTheme = useSetTheme();
   const { search, change } = useSearch();
+  const [countReturns, setCountReturns] = useState(false);
+  useEffect(() => {
+    load<boolean>(KEYS.countReturns, false).then((v) => setCountReturns(v === true));
+  }, []);
   return (
     <ScrollView style={{ backgroundColor: t.background }} contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
       <Text style={[styles.heading, { color: t.text }]}>Theme</Text>
@@ -52,6 +58,25 @@ export default function Settings() {
       <Text style={[styles.heading, { color: t.text }]}>Trip</Text>
       {/* The same number as in Trip details: prices are checked for this many adults */}
       <Stepper theme={t} label="Adults" value={search.adults} min={TRIP_LIMITS.adults.min} max={TRIP_LIMITS.adults.max} onChange={(adults) => change({ adults })} />
+      <View style={styles.setting}>
+        <View style={styles.settingText}>
+          <Text style={[styles.linkText, { color: t.text }]}>Count return flights for every outbound flight</Text>
+          <Text style={[styles.small, { color: t.muted }]}>
+            Off: counted for the first outbound flight of each date, the rest when you ask. On: counted for the first
+            five of each date as soon as a destination opens (about 15 more searches per destination).
+          </Text>
+        </View>
+        <Switch
+          value={countReturns}
+          onValueChange={(v) => {
+            setCountReturns(v);
+            save(KEYS.countReturns, v);
+          }}
+          trackColor={{ false: t.border, true: t.price }}
+          thumbColor={t.text}
+          accessibilityLabel="Count return flights for every outbound flight"
+        />
+      </View>
       <Pressable
         onPress={() => router.push('/planner')}
         accessibilityRole="button"
@@ -107,6 +132,8 @@ const styles = StyleSheet.create({
   swatchLand: { position: 'absolute', left: 8, top: 12, width: 30, height: 22, borderRadius: 8 },
   swatchSelected: { position: 'absolute', left: 26, top: 28, width: 18, height: 14, borderRadius: 5 },
   swatchDot: { position: 'absolute', left: 14, top: 38, width: 8, height: 8, borderRadius: 4 },
+  setting: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  settingText: { flex: 1, gap: 2 },
   link: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, minHeight: TOUCH + 4 },
   linkText: { fontFamily: FONTS.bodyMedium, fontSize: 15 },
   form: { gap: 10 },

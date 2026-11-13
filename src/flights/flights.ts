@@ -95,6 +95,22 @@ export function compare(list: Itinerary[]): Comparison {
   };
 }
 
+/** How many return flights go with an outbound flight, in words. */
+export function returnsText(count: number): string {
+  return count === 0 ? 'No return flights' : count === 1 ? '1 return flight' : `${count} return flights`;
+}
+
+/**
+ * The same for a whole date option, from the outbound flights counted so far:
+ * "6 return flights" when they all agree or only one was counted, "3–7 return flights" otherwise.
+ */
+export function returnsRange(counts: number[]): string {
+  if (counts.length === 0) return '';
+  const lo = Math.min(...counts);
+  const hi = Math.max(...counts);
+  return lo === hi ? returnsText(lo) : `${lo}–${hi} return flights`;
+}
+
 /** The chosen flights, ready to hand to the trip planner. `returnFrom` is the airport flown home from. */
 export function buildTrip(origin: string, destination: string, returnFrom: string, adults: number, outbound: Itinerary, inbound: Itinerary): TripSelection {
   // Google shows the whole trip's price on the return option; fall back to the outbound's if it has none

@@ -2,6 +2,8 @@
 // options for an outbound you pick, and a comparison of price, time and stops between the dates.
 // "Fly back from" lets the return leave from a different airport than the one you arrive at.
 // Each live check and each list of returns is one SerpApi search (free when repeated within the hour).
+// Return flights are counted for the first outbound flight of every date automatically, and for the others
+// on request (or automatically, with the setting in Settings → Trip).
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -9,7 +11,7 @@ import { Itinerary, Usage } from '../../shared/types';
 import { api, Connection } from '../api/client';
 import {
   airlinesText, arrivalDayShift, buildTrip, clock, compare, DatePair, datePairs, decodePairs, durationText, findAirports,
-  nearest, routeText, stopsLine,
+  nearest, returnsRange, returnsText, routeText, stopsLine,
 } from '../flights/flights';
 import { Airport, airportByCode, airportCodesIn, airportLabel, AIRPORTS } from '../map/mapData';
 import { useTrips } from '../planner/TripsContext';
@@ -30,6 +32,8 @@ const keyOf = (back: string, p: DatePair) => `${back}|${p.out}_${p.ret}`;
 const NEARBY = 6;
 /** How many options are listed before "Show all". */
 const SHOWN = 5;
+/** Returns are kept per outbound flight (named by its token), so each can show how many it has. */
+const returnsKey = (k: string, it: Itinerary) => `${k}#${it.departureToken ?? 'none'}`;
 
 export default function DestinationScreen() {
   const t = useTheme();
@@ -56,14 +60,45 @@ export default function DestinationScreen() {
   const [selection] = useSelection();
   const [openPair, setOpenPair] = useState<DatePair | undefined>(pairs[0]);
   const open = openPair ? keyOf(back, openPair) : '';
-  /** The outbound flight picked for each date pair, and the returns loaded for it. */
+  /** The outbound flight picked for each date pair, and the returns loaded for each outbound flight. */
   const [picked, setPicked] = useState<Record<string, Itinerary>>({});
   const [returns, setReturns] = useState<Record<string, Loaded>>({});
+  /** Outbound flights whose returns were asked for already, so none is searched twice. */
+  const asked = useRef(new Set<string>());
+  /** The owner's setting: count the returns of every listed outbound flight without being asked. */
+  const countEvery = useRef(false);
   const [showAll, setShowAll] = useState<Record<string, boolean>>({});
   const started = useRef(false);
   /** Fly-back airports whose date pairs have been (or are being) checked. */
   const checked = useRef(new Set<string>());
 
+  /** Loads the return flights that go with one outbound flight (one search; free if it was asked before). */
+  const loadReturns = useCallback(
+    async (c: Connection, from: string, p: DatePair, it: Itinerary) => {
+      const key = returnsKey(keyOf(from, p), it);
+      if (asked.current.has(key)) return;
+      asked.current.add(key);
+      if (!it.departureToken) {
+        setReturns((x) => ({ ...x, [key]: { status: 'done', list: [], error: 'Google gave no way to list returns for this flight.', cached: false } }));
+        return;
+      }
+      setReturns((x) => ({ ...x, [key]: { ...WAITING, status: 'loading' } }));
+      const r = await api.returns(c, { origin, dest: code, back: from, out: p.out, ret: p.ret, adults: search.adults, departureToken: it.departureToken });
+      if (r.usage) setUsage(r.usage);
+      // A failed lookup may be tried again
+      if (!r.ok) asked.current.delete(key);
+      setReturns((x) => ({
+        ...x,
+        [key]: r.ok ? { status: 'done', list: r.data, error: null, cached: r.cached } : { status: 'done', list: [], error: r.error, cached: false },
+      }));
+    },
+    [origin, code, search.adults],
+  );
+
+  /**
+   * Checks one date pair live, then counts return flights: always for the first (best) outbound flight, so
+   * every date option shows a number, and for the first five when the "count every outbound" setting is on.
+   */
   const check = useCallback(
     async (c: Connection, from: string, p: DatePair) => {
       setOutbound((o) => ({ ...o, [keyOf(from, p)]: { ...WAITING, status: 'loading' } }));
@@ -73,8 +108,10 @@ export default function DestinationScreen() {
         ...o,
         [keyOf(from, p)]: r.ok ? { status: 'done', list: r.data, error: null, cached: r.cached } : { status: 'done', list: [], error: r.error, cached: false },
       }));
+      if (!r.ok) return;
+      for (const it of r.data.slice(0, countEvery.current ? SHOWN : 1)) await loadReturns(c, from, p, it);
     },
-    [origin, code, search.adults],
+    [origin, code, search.adults, loadReturns],
   );
 
   // On opening: check the date pairs one after the other
@@ -82,6 +119,7 @@ export default function DestinationScreen() {
     if (started.current) return;
     started.current = true;
     (async () => {
+      countEvery.current = (await load<boolean>(KEYS.countReturns, false)) === true;
       const c = await load<Connection | null>(KEYS.connection, null);
       if (!c?.url || !c?.token) {
         setConn({ url: '', token: '' });
@@ -116,20 +154,19 @@ export default function DestinationScreen() {
   const matches = finding ? findAirports(typed, AIRPORTS).filter((a) => a.code !== code && a.cc !== search.departureCc) : [];
 
   const pickOutbound = async (p: DatePair, it: Itinerary) => {
-    const k = keyOf(back, p);
-    setPicked((x) => ({ ...x, [k]: it }));
-    if (!conn || !it.departureToken) {
-      setReturns((x) => ({ ...x, [k]: { status: 'done', list: [], error: 'Google gave no way to list returns for this flight.', cached: false } }));
-      return;
-    }
-    setReturns((x) => ({ ...x, [k]: { ...WAITING, status: 'loading' } }));
-    const r = await api.returns(conn, { origin, dest: code, back, out: p.out, ret: p.ret, adults: search.adults, departureToken: it.departureToken });
-    if (r.usage) setUsage(r.usage);
-    setReturns((x) => ({
-      ...x,
-      [k]: r.ok ? { status: 'done', list: r.data, error: null, cached: r.cached } : { status: 'done', list: [], error: r.error, cached: false },
-    }));
+    setPicked((x) => ({ ...x, [keyOf(back, p)]: it }));
+    if (conn?.url && conn?.token) await loadReturns(conn, back, p, it);
   };
+
+  /** Counts the returns of every outbound flight in a list that hasn't been counted yet. */
+  const countAll = async (p: DatePair, list: Itinerary[]) => {
+    if (!conn?.url || !conn?.token) return;
+    for (const it of list) await loadReturns(conn, back, p, it);
+  };
+
+  /** How many return flights each counted outbound flight of a date pair has. */
+  const countsFor = (k: string, list: Itinerary[]) =>
+    list.map((it) => returns[returnsKey(k, it)]).filter((r): r is Loaded => r?.status === 'done' && !r.error).map((r) => r.list.length);
 
   const choose = async (p: DatePair, inbound: Itinerary) => {
     const out = picked[keyOf(back, p)];
@@ -190,7 +227,7 @@ export default function DestinationScreen() {
       )}
       <Text style={[styles.small, { color: t.muted }]}>
         {back === code
-          ? 'Pick another airport to arrive here and fly home from there. That checks the dates again (about 3 searches).'
+          ? 'Pick another airport to arrive here and fly home from there. That checks the dates again and counts their return flights (up to 6 searches).'
           : `Arriving at ${airportLabel(code)}, flying home from ${airportLabel(back)}. Getting between them is up to you.`}
       </Text>
 
@@ -217,8 +254,17 @@ export default function DestinationScreen() {
                     : o.status === 'loading' ? 'Checking live prices…'
                     : o.error ? o.error
                     : c.count === 0 ? 'No flights found'
-                    : `${c.count} options · fastest ${durationText(c.fastestMin ?? 0)} · ${c.fewestStops === 0 ? 'nonstop available' : `${c.fewestStops}+ stops`}`}
+                    : `${c.count} outbound ${c.count === 1 ? 'flight' : 'flights'} · fastest ${durationText(c.fastestMin ?? 0)} · ${c.fewestStops === 0 ? 'nonstop available' : `${c.fewestStops}+ stops`}`}
                 </Text>
+                {o.status === 'done' && !o.error && c.count > 0 && (
+                  <Text style={[styles.small, { color: t.price }]} numberOfLines={1}>
+                    {(() => {
+                      const counts = countsFor(k, o.list);
+                      if (counts.length === 0) return 'Counting return flights…';
+                      return `${returnsRange(counts)}${counts.length === 1 ? ' with the first outbound flight' : ` (${counts.length} outbound flights counted)`}`;
+                    })()}
+                  </Text>
+                )}
               </View>
               <Text style={[styles.price, { color: c.cheapest != null ? t.price : t.muted }]}>{c.cheapest != null ? `$${c.cheapest}` : '—'}</Text>
             </Pressable>
@@ -241,8 +287,9 @@ export default function DestinationScreen() {
         const k = keyOf(back, p);
         const o = outbound[k] ?? WAITING;
         const mine = picked[k];
-        const loaded = returns[k];
+        const loaded = mine ? returns[returnsKey(k, mine)] : undefined;
         const list = showAll[k] ? o.list : o.list.slice(0, SHOWN);
+        const uncounted = list.filter((it) => it.departureToken && !returns[returnsKey(k, it)]);
         return (
           <View key={k} style={styles.block}>
             <Text style={[styles.section, { color: t.text }]}>Outbound · {shortDate(p.out)}</Text>
@@ -250,9 +297,21 @@ export default function DestinationScreen() {
             {o.status === 'done' && o.error && conn && (
               <SmallButton theme={t} label="Try again" onPress={() => check(conn, back, p)} />
             )}
-            {list.map((it, i) => (
-              <Option key={`o${i}`} theme={t} it={it} selected={mine === it} onPress={() => pickOutbound(p, it)} action={mine === it ? 'Selected' : 'See returns'} />
-            ))}
+            {list.map((it, i) => {
+              const r = returns[returnsKey(k, it)];
+              // How many return flights go with this outbound flight, once counted
+              const extra = !r ? 'Returns not counted yet' : r.status !== 'done' ? 'Counting return flights…' : r.error ? 'Could not count returns' : returnsText(r.list.length);
+              return (
+                <Option key={`o${i}`} theme={t} it={it} selected={mine === it} onPress={() => pickOutbound(p, it)} action={mine === it ? 'Selected' : 'See returns'} extra={extra} strong={r?.status === 'done' && !r.error} />
+              );
+            })}
+            {uncounted.length > 0 && (
+              <SmallButton
+                theme={t}
+                label={`Count returns for ${uncounted.length === 1 ? 'the other flight' : `the other ${uncounted.length} flights`} (${uncounted.length} ${uncounted.length === 1 ? 'search' : 'searches'})`}
+                onPress={() => countAll(p, uncounted)}
+              />
+            )}
             {o.list.length > SHOWN && !showAll[k] && (
               <SmallButton theme={t} label={`Show all ${o.list.length}`} onPress={() => setShowAll((x) => ({ ...x, [k]: true }))} />
             )}
@@ -280,7 +339,7 @@ export default function DestinationScreen() {
 }
 
 /** One flight option: times, route, duration, stops, airline, price. */
-function Option({ theme: t, it, selected, onPress, action }: { theme: Theme; it: Itinerary; selected: boolean; onPress: () => void; action: string }) {
+function Option({ theme: t, it, selected, onPress, action, extra, strong }: { theme: Theme; it: Itinerary; selected: boolean; onPress: () => void; action: string; extra?: string; strong?: boolean }) {
   const first = it.legs[0];
   const last = it.legs[it.legs.length - 1];
   const shift = arrivalDayShift(it);
@@ -297,6 +356,7 @@ function Option({ theme: t, it, selected, onPress, action }: { theme: Theme; it:
         <Text style={[styles.small, { color: t.muted }]} numberOfLines={1}>{routeText(it)} · {durationText(it.durationMin)}</Text>
         <Text style={[styles.small, { color: t.muted }]} numberOfLines={2}>{stopsLine(it)}</Text>
         <Text style={[styles.small, { color: t.muted }]} numberOfLines={1}>{airlinesText(it)} · {it.legs.map((l) => l.flightNumber).filter(Boolean).join(', ')}</Text>
+        {extra ? <Text style={[styles.small, { color: strong ? t.price : t.muted }]} numberOfLines={1}>{extra}</Text> : null}
       </View>
       <View style={styles.right}>
         <Text style={[styles.price, { color: it.price != null ? t.price : t.muted }]}>{it.price != null ? `$${it.price}` : '—'}</Text>

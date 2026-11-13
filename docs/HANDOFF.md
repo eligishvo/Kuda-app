@@ -130,6 +130,15 @@ Added 2026-11-13: **trip planner, version 1** (brief: `docs/PLANNER.md`, decided
 - "My trips" (`src/app/planner.tsx`, reachable from the map and Settings) lists saved trips with Open / Delete.
 - Trips live on the phone under `kuda.trips`; flights chosen with an earlier version become the first trip.
 
+Added 2026-11-13: **return flights counted** (owner's request):
+- Destination screen: every outbound flight shows "N return flights" once counted, and every date option shows
+  the count (or a range, "3–7 return flights", when several outbound flights were counted).
+- Counting costs one search per outbound flight (that is how Google lists returns), so: the first outbound flight
+  of each date is counted automatically; "Count returns for the other N flights (N searches)" does the rest of
+  the visible list; Settings → Trip → "Count return flights for every outbound flight" does the first five of
+  each date automatically. Returns already loaded are never searched again in the same visit.
+- Opening a destination now uses up to 6 searches (3 dates + 3 counts); from a results-list line, 2.
+
 ## How to test on a phone
 
 1. In the repo folder: `git pull`, `npm install`, `npx expo start`.
@@ -258,8 +267,8 @@ rings on the map should follow. Close and reopen the app: the search should stil
 - **While results show, map taps don't change the destinations** (only pins respond); "Destinations" goes back.
 - **"No estimate — tap to check":** a pin tap highlights the row; the row's "Check flights" button opens the
   destination screen, which runs the live checks.
-- **Opening a destination spends up to 3 searches without asking** (as the brief describes); the screen shows
-  how many are left. Returns are loaded only when an outbound flight is tapped.
+- **Opening a destination spends up to 6 searches without asking** (3 live date checks, as the brief describes,
+  plus one return count per date since 2026-11-13); the screen shows how many are left. Returns are loaded only when an outbound flight is tapped.
 - **Live checks use the first departure airport and the search's number of travelers.**
 - **Calendar:** written in the app (`src/ui/Calendar.tsx`) instead of adding a date-picker library, so it follows
   the themes and needs no native code. Weeks start on Sunday.
@@ -290,6 +299,8 @@ None recorded yet (nothing has run on a phone).
 
 ## Changelog
 
+- **2026-11-13** — Return flights counted per outbound flight and per date option on the destination screen;
+  setting to count them all automatically. 152 tests. Published as an update.
 - **2026-11-13** — Trip planner version 1: trips started from chosen flights, with Plan, Stay, Budget, List and
   Flights tabs; "My trips". Rules in `src/planner/trip.ts` (14 tests; 150 in total). Published as an update.
 - **2026-11-12** — Fourth round: source badge on every price, "Price sources" explainer, "See who sells it" on
