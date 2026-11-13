@@ -4,7 +4,7 @@ import { allowanceText } from '../flights/live';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Usage } from '../../shared/types';
-import { originOf, priceText, Result, Results, stopsText } from '../results/results';
+import { excludedText, originOf, priceText, Result, Results, stopsText } from '../results/results';
 import { daysText, shortDate } from '../search/search';
 import { FONTS, Theme, TOUCH } from '../theme/themes';
 
@@ -53,13 +53,13 @@ export function ResultsSheet({ theme: t, results, loading, progress, error, usag
       {!loading && results && (
         <Text style={[styles.note, { color: t.muted }]}>
           {[
-            results.overBudget > 0 ? `${results.overBudget} more cost over $${budget}` : '',
+            excludedText(results.excluded, budget),
             allowanceText(usage),
           ].filter(Boolean).join(' · ') || 'Prices are per person, round trip.'}
         </Text>
       )}
       {!loading && results && list.length === 0 && !error && (
-        <Text style={[styles.note, { color: t.muted }]}>Nothing fits these dates and budget. Try a wider window or a higher budget.</Text>
+        <Text style={[styles.note, { color: t.muted }]}>Nothing fits these dates and your search's rules. The full list says why for each airport.</Text>
       )}
       {!loading && list.length > 0 && (
         <Text style={[styles.note, { color: t.muted }]}>Tap a destination, then "Compare flights" to see its dates (free). Live prices are checked only when you tap Check there, up to one search per date pair.</Text>
@@ -81,7 +81,7 @@ export function ResultsSheet({ theme: t, results, loading, progress, error, usag
                 <Text style={[styles.detail, { color: t.muted }]} numberOfLines={1}>
                   {e
                     ? [`${shortDate(e.outDate)} – ${shortDate(e.retDate)}`, daysText(e.nights), stopsText(e.stops), sourceNote(r.kind)].filter(Boolean).join(' · ')
-                    : sourceNote('none')}
+                    : r.note ?? sourceNote('none')}
                 </Text>
               </View>
               <View style={styles.right}>

@@ -18,15 +18,27 @@ export type Result = {
   lon: number;
   kind: ResultKind;
   estimate?: PriceEstimate;
+  /** Priced as two one-way tickets (out and back bought separately). */
+  split?: boolean;
+  /** For an airport with nothing shown: why (no cached fare, wrong dates, over budget, only with stops). */
+  reason?: Reason;
+  /** That reason in words, e.g. "$450 each, over your $400 budget". */
+  note?: string;
 };
+
+/**
+ * Why a selected airport shows nothing: no fare at all, fares only on other dates, or fares that the search's
+ * own rules leave out (over budget, only with stops while "Nonstop only" is on, or another filter).
+ */
+export type Reason = 'none' | 'dates' | 'budget' | 'nonstop' | 'other';
 
 export type AirportInfo = { code: string; name: string; city: string; cc: string; lat: number; lon: number };
 
 export type Results = {
-  /** Priced destinations within budget, cheapest first, then the ones with no estimate. */
+  /** Priced destinations that pass the search's rules, cheapest first, then the selected ones with nothing. */
   list: Result[];
-  /** How many priced destinations were left out for costing more than the budget. */
-  overBudget: number;
+  /** How many destinations had fares for the dates that the search's rules left out, by reason. */
+  excluded: { budget: number; nonstop: number; other: number };
 };
 
 /** The most Explore calls one search may make (each is one SerpApi search). */
@@ -90,65 +102,101 @@ export function windowOf(s: Search): Window {
   return { earliestOut: s.earliestOut, latestRet: s.latestRet, minNights: min, maxNights: max };
 }
 
-/** Connecting Travelpayouts fares are the least trustworthy, so anything else is preferred to them. */
-const trust = (d: Destination) => (d.estimate.confidence === 'rough' ? 1 : 0);
-
-/** The best entry per airport among those whose dates fit the window: trusted before rough, then the cheapest. */
-function bestFitting(lists: Destination[][], w: Window): Map<string, Destination> {
-  const best = new Map<string, Destination>();
-  for (const list of lists) {
-    for (const d of list) {
-      if (!fitsWindow(d.estimate.outDate, d.estimate.retDate, w)) continue;
-      const prev = best.get(d.airport);
-      if (!prev || trust(d) < trust(prev) || (trust(d) === trust(prev) && d.estimate.price < prev.estimate.price)) best.set(d.airport, d);
-    }
-  }
-  return best;
-}
+/** Google's price before an Aviasales estimate, and an estimate before a rough (connecting) one. */
+const TRUST: Record<ResultKind, number> = { live: 0, estimate: 1, rough: 2, none: 3 };
 
 /**
- * Builds the results.
- *   selected — the destination airports the user picked on the map; empty means "anywhere"
- *   explore / estimates — what the Worker returned for each planned call
+ * Builds the map's pins from the same options the results list shows, after the same rules
+ * (`defaultFilters`: dates and trip length, budget, Nonstop only), so the two always agree. Each arrival
+ * airport gets its most trusted fare that passes, then the cheapest. Pins are for trips that come home from
+ * the same airport; "home from another airport" lines are in the list only.
+ *   selected — the destination airports picked on the map; empty means "anywhere"
+ *   options — every dated option (buildOptions + two-ticket trips), before filtering
+ *   lists — every raw price list, to tell "no fare at all" from "fares only on other dates"
  *   infoOf — name, city and position of an airport from the bundled data
- * Google's price wins; Travelpayouts only fills airports Google gave nothing usable for.
  */
 export function buildResults(
   s: Search,
   selected: string[],
-  explore: Destination[][],
-  estimates: Destination[][],
+  options: Option[],
+  lists: Destination[][],
   infoOf: (code: string) => AirportInfo | undefined,
 ): Results {
-  const w = windowOf(s);
-  const live = bestFitting(explore, w);
-  const filler = bestFitting(estimates, w);
+  const f = defaultFilters(s);
+  const roundTrips = options.filter((o) => !o.back);
+  const best = new Map<string, Option>();
+  for (const o of filterOptions(roundTrips, f)) {
+    const prev = best.get(o.airport);
+    if (!prev || TRUST[o.kind] < TRUST[prev.kind] || (TRUST[o.kind] === TRUST[prev.kind] && o.estimate.price < prev.estimate.price)) best.set(o.airport, o);
+  }
+  const excluded = { budget: 0, nonstop: 0, other: 0 };
   const anywhere = selected.length === 0;
-  const codes = anywhere ? [...new Set([...live.keys(), ...filler.keys()])] : [...new Set(selected)];
+  const codes = anywhere ? [...new Set(roundTrips.map((o) => o.airport))] : [...new Set(selected)];
 
   const priced: Result[] = [];
   const none: Result[] = [];
-  let overBudget = 0;
   for (const code of codes) {
-    const found = live.get(code) ?? filler.get(code);
-    const info = infoOf(code);
-    // An airport that is neither in the bundled data nor located by Google can't be put on the map
-    const lat = info?.lat ?? found?.lat;
-    const lon = info?.lon ?? found?.lon;
-    if (lat == null || lon == null) continue;
-    if (info?.cc === s.departureCc) continue;
-    const base = { airport: code, cc: info?.cc ?? '', city: info?.city || found?.city || code, name: info?.name ?? found?.city ?? code, lat, lon };
-    if (!found) {
-      none.push({ ...base, kind: 'none' });
-    } else if (found.estimate.price > s.budget) {
-      overBudget += 1;
-    } else {
-      priced.push({ ...base, kind: found.estimate.confidence, estimate: found.estimate });
+    const pick = best.get(code);
+    if (pick) {
+      const { back: _back, ...result } = pick;
+      priced.push(result);
+      continue;
     }
+    const verdict = whyNothing(s, code, roundTrips, lists, f);
+    if (verdict.reason === 'budget' || verdict.reason === 'nonstop' || verdict.reason === 'other') excluded[verdict.reason] += 1;
+    if (anywhere) continue;
+    const info = infoOf(code);
+    if (!info || info.cc === s.departureCc) continue;
+    none.push({ airport: code, cc: info.cc, city: info.city || code, name: info.name, lat: info.lat, lon: info.lon, kind: 'none', reason: verdict.reason, note: verdict.note });
   }
   priced.sort((a, b) => a.estimate!.price - b.estimate!.price || a.airport.localeCompare(b.airport));
   none.sort((a, b) => a.city.localeCompare(b.city));
-  return { list: [...priced, ...none], overBudget };
+  return { list: [...priced, ...none], excluded };
+}
+
+/** Which of the search's rules leaves an option out, checked in this order; null = it is shown. */
+export type Exclusion = 'mixed' | 'length' | 'nonstop' | 'live' | 'budget';
+export function excludedBy(o: Option, f: Filters): Exclusion | null {
+  const e = o.estimate;
+  if (!f.mixed && o.back) return 'mixed';
+  if (e.nights < f.minDays || e.nights > f.maxDays) return 'length';
+  if (f.nonstopOnly && e.stops !== 0) return 'nonstop';
+  if (f.liveOnly && o.kind !== 'live') return 'live';
+  if (e.price > f.maxPrice) return 'budget';
+  return null;
+}
+
+/**
+ * Why an airport shows nothing, in words. Fares that fit the dates but break a rule come first (the closest
+ * to being shown: over budget before "only with stops"), then fares on other dates, then no fare at all.
+ */
+export function whyNothing(
+  s: Search,
+  code: string,
+  options: Option[],
+  lists: Destination[][],
+  f: Filters = defaultFilters(s),
+): { reason: Reason; note: string; near?: Option } {
+  const mine = options.filter((o) => o.airport === code).sort((a, b) => a.estimate.price - b.estimate.price);
+  const overBudget = mine.find((o) => excludedBy(o, f) === 'budget');
+  if (overBudget) return { reason: 'budget', note: `$${overBudget.estimate.price} each, over your $${f.maxPrice} budget`, near: overBudget };
+  const withStops = mine.find((o) => excludedBy(o, f) === 'nonstop');
+  if (withStops) return { reason: 'nonstop', note: `Only flights with stops ($${withStops.estimate.price} each); Nonstop only is on`, near: withStops };
+  if (mine.length > 0) return { reason: 'other', note: 'Left out by the filters', near: mine[0] };
+  let near: PriceEstimate | undefined;
+  let score = Infinity;
+  for (const list of lists) {
+    for (const d of list) {
+      if (d.airport !== code) continue;
+      const by = missBy(d.estimate, s);
+      if (by < score || (by === score && near && d.estimate.price < near.price)) {
+        score = by;
+        near = d.estimate;
+      }
+    }
+  }
+  if (near) return { reason: 'dates', note: `Only other dates: closest ${shortDate(near.outDate)} – ${shortDate(near.retDate)}, ${whyMissed(near, s)}` };
+  return { reason: 'none', note: 'No cached fare for this airport in these months' };
 }
 
 /** How a price is written: "$142" for Google's, "from ~$110" for estimates, "~$310?" for rough ones. */
@@ -172,8 +220,6 @@ export function stopsText(stops: number | null): string {
 export type Option = Result & {
   estimate: PriceEstimate;
   back?: { airport: string; city: string; name: string };
-  /** Priced as two one-way tickets (out and back bought separately). */
-  split?: boolean;
 };
 
 /** With nothing selected, only airports this close to each other are paired (kilometres). */
@@ -314,14 +360,7 @@ export const defaultFilters = (s: Search): Filters => ({
 
 /** Applies the results screen's filters and sorting. */
 export function filterOptions(options: Option[], f: Filters): Option[] {
-  const kept = options.filter((o) => {
-    const e = o.estimate;
-    if (e.price > f.maxPrice || e.nights < f.minDays || e.nights > f.maxDays) return false;
-    if (f.nonstopOnly && e.stops !== 0) return false;
-    if (f.liveOnly && o.kind !== 'live') return false;
-    if (!f.mixed && o.back) return false;
-    return true;
-  });
+  const kept = options.filter((o) => excludedBy(o, f) === null);
   const byPrice = (a: Option, b: Option) => a.estimate.price - b.estimate.price || a.estimate.outDate.localeCompare(b.estimate.outDate) || a.airport.localeCompare(b.airport);
   if (f.sort === 'date') kept.sort((a, b) => a.estimate.outDate.localeCompare(b.estimate.outDate) || byPrice(a, b));
   else if (f.sort === 'length') kept.sort((a, b) => a.estimate.nights - b.estimate.nights || byPrice(a, b));
@@ -448,17 +487,16 @@ export function mergeOptions(lists: Option[][]): Option[] {
   return [...best.values()];
 }
 
-/** Two-ticket options turned back into price lists, so the map's pins can use them too. */
-export const asDestinations = (options: Option[]): Destination[] =>
-  options.filter((o) => !o.back).map((o) => ({ airport: o.airport, city: o.city, lat: o.lat, lon: o.lon, estimate: o.estimate }));
-
-/** A selected airport with nothing that fits, and the nearest thing that was found for it. */
+/** A selected airport with nothing in the list, why, and the nearest fare that was found for it. */
 export type Missing = {
   airport: string;
   city: string;
   name: string;
-  /** The price that came closest to the search, and why it doesn't fit. */
-  near?: { estimate: PriceEstimate; kind: ResultKind; why: string };
+  reason: Reason;
+  /** The reason in words, e.g. "Only flights with stops ($210 each); Nonstop only is on". */
+  note: string;
+  /** The fare that came closest, for its source label. */
+  near?: { estimate: PriceEstimate; kind: ResultKind };
 };
 
 /** How far a trip is from fitting the search, in days (0 = it fits). */
@@ -481,8 +519,9 @@ function whyMissed(e: PriceEstimate, s: Search): string {
 }
 
 /**
- * The selected airports that got no option that fits the dates, each with the closest price found and why it
- * doesn't fit (e.g. Google's only trip to Vienna is 16 days and ends on 6 April). Empty when nothing is selected.
+ * The selected airports with no line in the results list (after the search's own rules: dates, length,
+ * budget, Nonstop only), each with why: no cached fare, fares only on other dates, over budget, or only with
+ * stops. Closest to fitting first. Empty when nothing is selected.
  */
 export function missingDestinations(
   s: Search,
@@ -492,24 +531,31 @@ export function missingDestinations(
   infoOf: (code: string) => AirportInfo | undefined,
 ): Missing[] {
   if (selected.length === 0) return [];
-  const covered = new Set(options.filter((o) => !o.back).map((o) => o.airport));
+  const f = defaultFilters(s);
+  const shown = new Set(filterOptions(options, f).map((o) => o.airport));
+  const order: Record<Reason, number> = { budget: 0, nonstop: 1, other: 2, dates: 3, none: 4 };
   const out: (Missing & { score: number })[] = [];
   for (const code of [...new Set(selected)]) {
     const info = infoOf(code);
-    if (covered.has(code) || !info || info.cc === s.departureCc) continue;
-    let near: Missing['near'];
-    let score = Infinity;
-    for (const list of lists) {
-      for (const d of list) {
-        if (d.airport !== code) continue;
-        const by = missBy(d.estimate, s);
-        if (by < score || (by === score && near && d.estimate.price < near.estimate.price)) {
-          score = by;
-          near = { estimate: d.estimate, kind: d.estimate.confidence, why: whyMissed(d.estimate, s) };
+    if (shown.has(code) || !info || info.cc === s.departureCc) continue;
+    const v = whyNothing(s, code, options, lists, f);
+    let near: Missing['near'] = v.near ? { estimate: v.near.estimate, kind: v.near.kind } : undefined;
+    let score = 0;
+    if (v.reason === 'dates') {
+      // The fare on other dates that came closest, for its source label
+      score = Infinity;
+      for (const list of lists) {
+        for (const d of list) {
+          if (d.airport !== code) continue;
+          const by = missBy(d.estimate, s);
+          if (by < score || (by === score && near && d.estimate.price < near.estimate.price)) {
+            score = by;
+            near = { estimate: d.estimate, kind: d.estimate.confidence };
+          }
         }
       }
     }
-    out.push({ airport: code, city: info.city || code, name: info.name, near, score });
+    out.push({ airport: code, city: info.city || code, name: info.name, reason: v.reason, note: v.note, near, score: order[v.reason] * 1000 + Math.min(score, 999) });
   }
   return out
     .sort((a, b) => a.score - b.score || a.city.localeCompare(b.city))
@@ -524,4 +570,31 @@ export function estimateFor(options: Option[], code: string, back: string, p: { 
   return options
     .filter((o) => o.airport === code && (o.back?.airport ?? o.airport) === back && o.estimate.outDate === p.out && o.estimate.retDate === p.ret)
     .sort((a, b) => a.estimate.price - b.estimate.price)[0];
+}
+
+/** What an empty results list says: no fare for the dates at all, or how many fares each rule left out. */
+export function emptyListText(options: Option[], f: Filters): string {
+  if (options.length === 0) return 'No cached fare fits these dates. See below for what each airport had, or try wider dates or a different trip length.';
+  const count: Record<Exclusion, number> = { mixed: 0, length: 0, nonstop: 0, live: 0, budget: 0 };
+  for (const o of options) {
+    const why = excludedBy(o, f);
+    if (why) count[why] += 1;
+  }
+  const parts = [
+    count.budget ? `${count.budget} over $${f.maxPrice}` : '',
+    count.nonstop ? `${count.nonstop} only with stops (Nonstop only is on)` : '',
+    count.length ? `${count.length} the wrong length` : '',
+    count.live ? `${count.live} estimates (Live prices only is on)` : '',
+    count.mixed ? `${count.mixed} flying home from another airport` : '',
+  ].filter(Boolean);
+  return `Nothing passes the filters: ${parts.join(', ')}.`;
+}
+
+/** The map panel's line about destinations left out by the search's rules: "2 over $400 · 1 only with stops". */
+export function excludedText(x: Results['excluded'], budget: number): string {
+  return [
+    x.budget ? `${x.budget} more over $${budget}` : '',
+    x.nonstop ? `${x.nonstop} only with stops` : '',
+    x.other ? `${x.other} left out by filters` : '',
+  ].filter(Boolean).join(' · ');
 }

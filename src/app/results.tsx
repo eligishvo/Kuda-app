@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 import { encodePairs } from '../flights/flights';
 import { allowanceText } from '../flights/live';
-import { defaultFilters, filterOptions, Filters, Option, originOf, priceText, Sort, stopsText, totalCost } from '../results/results';
+import { defaultFilters, emptyListText, filterOptions, Filters, Option, originOf, priceText, Sort, stopsText, totalCost } from '../results/results';
 import { useResults } from '../results/useResults';
 import { daysText, lengthNote, lengthRange, LIMITS, Search, shortDate, travelersText } from '../search/search';
 import { useSearch } from '../search/SearchContext';
@@ -42,19 +42,18 @@ export default function ResultsScreen() {
 
   const footer = !loading && found.missing.length > 0 && (
     <View style={styles.missing}>
-      <Text style={[styles.section, { color: t.text }]}>Nothing that fits for {found.missing.length} selected {found.missing.length === 1 ? 'airport' : 'airports'}</Text>
+      <Text style={[styles.section, { color: t.text }]}>Not in the list: {found.missing.length} selected {found.missing.length === 1 ? 'airport' : 'airports'}</Text>
       <Text style={[styles.small, { color: t.muted }]}>
-        The price sources only know some dates. Here is the closest each one had; "See dates" opens the destination
-        for free, and you choose there which dates to check live (up to one search each).
+        Why each one shows nothing: no cached fare, fares only on other dates, or fares your search leaves out (over
+        budget, or only with stops while Nonstop only is on). "See dates" opens the destination for free; you choose
+        there which dates to check live (up to one search each).
       </Text>
       {found.missing.map((m) => (
         <View key={m.airport} style={[styles.row, { backgroundColor: t.panel, borderColor: t.border }]}>
           <View style={styles.flex}>
             <Text style={[styles.city, { color: t.text }]} numberOfLines={1}>{m.city} ({m.airport})</Text>
             <Text style={[styles.small, { color: t.muted }]} numberOfLines={2}>
-              {m.near
-                ? `Closest: ${shortDate(m.near.estimate.outDate)} – ${shortDate(m.near.estimate.retDate)}, $${m.near.estimate.price} each (${originOf(m.near.kind).source}) · ${m.near.why}`
-                : 'No price found for this airport in these months'}
+              {m.note}{m.near ? ` (${originOf(m.near.kind).source} ${originOf(m.near.kind).status.toLowerCase()})` : ''}
             </Text>
           </View>
           <Pressable onPress={() => checkLive(m.airport)} accessibilityRole="button" style={styles.liveBtn}>
@@ -133,9 +132,7 @@ export default function ResultsScreen() {
       {!loading && hidden > 0 && <Text style={[styles.small, { color: t.muted }]}>{hidden} more hidden by the filters.</Text>}
       {!loading && found.status === 'done' && list.length === 0 && !found.error && (
         <Text style={[styles.body, { color: t.muted }]}>
-          {found.options.length === 0
-            ? 'No price fits these dates. See below for the closest ones, or try wider dates or a different trip length.'
-            : 'Nothing passes the filters. Raise the price or widen the trip length.'}
+          {emptyListText(found.options, filters)}
         </Text>
       )}
       {found.status === 'idle' && <Text style={[styles.body, { color: t.muted }]}>No search yet. Go back and tap Search.</Text>}

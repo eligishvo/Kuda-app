@@ -12,7 +12,7 @@ import { selectedAirports } from '../selection/selection';
 import { useSelection } from '../selection/useSelection';
 import { KEYS, load } from '../storage/store';
 import {
-  asDestinations, buildMixed, buildOptions, buildResults, buildSameAirport, mergeOptions, Missing, missingDestinations, Option, planCalls, Results,
+  buildMixed, buildOptions, buildResults, buildSameAirport, mergeOptions, Missing, missingDestinations, Option, planCalls, Results,
 } from './results';
 
 type Raw = { explore: Destination[][]; estimates: Destination[][]; outs: OneWay[][]; backs: OneWay[][]; key: string };
@@ -125,10 +125,6 @@ export function ResultsProvider({ children }: { children: ReactNode }) {
 
   // Changing the budget or filters re-filters what was fetched without a new search
   const same = useMemo(() => (raw ? buildSameAirport(search, selected, raw.outs, raw.backs, airportByCode) : []), [raw, search, selected]);
-  const results = useMemo(
-    () => (raw ? buildResults(search, selected, raw.explore, [...raw.estimates, asDestinations(same)], airportByCode) : null),
-    [raw, search, selected, same],
-  );
   const options = useMemo(
     () =>
       raw
@@ -141,6 +137,8 @@ export function ResultsProvider({ children }: { children: ReactNode }) {
     [raw, search, selected, same],
   );
   const lists = useMemo(() => (raw ? [...raw.explore, ...raw.estimates] : []), [raw]);
+  // The map's pins come from the same options and rules as the list, so both always show the same fares
+  const results = useMemo(() => (raw ? buildResults(search, selected, options, lists, airportByCode) : null), [raw, search, selected, options, lists]);
   const missing = useMemo(() => (raw ? missingDestinations(search, selected, lists, options, airportByCode) : []), [raw, search, selected, lists, options]);
   const stale = raw != null && raw.key !== callsKey(search, selected);
 

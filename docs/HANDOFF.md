@@ -182,6 +182,17 @@ QA fixes 2026-11-13 (owner's QA brief, four findings; all automated tests use fa
   repeating an unchanged search reuses the loaded prices without calling the Worker. Tests: `tests/live.test.ts`
   runs the app's client against the real Worker code with a fake SerpApi.
 
+- **2. The map and the list agree.** The map's pins are now built from the list's own options after the same
+  rules (`defaultFilters`: dates and length, budget, Nonstop only) and only then is one fare picked per airport
+  (Google's before an estimate before a rough one, then the cheapest). Before, the map picked Google's fare first
+  and only then checked the budget (a $450 Google fare hid a $300 estimate), and ignored Nonstop only. Pins are
+  for trips home from the same airport; "home from another airport" lines are in the list only. Every selected
+  airport with nothing shown says why: "No cached fare for this airport in these months", "Only other dates:
+  closest …", "$450 each, over your $400 budget" or "Only flights with stops; Nonstop only is on" (`whyNothing`,
+  used by the pins, the map panel and the list's "Not in the list" section). An empty list counts what each
+  rule left out (`emptyListText`). The map panel's "N more over $X" became "2 more over $400 · 1 only with
+  stops". Regression tests for both QA cases are in `tests/results.test.ts`.
+
 ## How to test on a phone
 
 1. In the repo folder: `git pull`, `npm install`, `npx expo start`.
@@ -345,6 +356,8 @@ None recorded yet (nothing has run on a phone).
 
 ## Changelog
 
+- **2026-11-13** — QA fix 2: map pins come from the list's options after the same rules; reasons for every
+  airport that shows nothing. 174 tests.
 - **2026-11-13** — QA fix 1: opening a destination is free; live checks and returns only on a tap that shows
   the cost; automatic return counting removed; Worker daily limit 8; real allowance shown everywhere. 170 tests.
 - **2026-11-13** — Duffel and a paid SerpApi plan put on hold by the owner; Test Duffel workflow kept.
