@@ -1,0 +1,20 @@
+# Run manually: searches Duffel for the trips the March search found on Google, to compare coverage and price.
+# Needs the repo secret DUFFEL_TOKEN (a live token from the Duffel dashboard). Duffel searches are free up to
+# 1,500 a month; this uses 5.
+name: Test Duffel
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Search Duffel
+        env:
+          DUFFEL_TOKEN: ${{ secrets.DUFFEL_TOKEN }}
+        run: node scripts/test-duffel.mjs
