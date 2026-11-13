@@ -148,7 +148,7 @@ describe('Worker: endpoints', () => {
     const { call, net, kv } = setup();
     await call('/estimates?origin=TLV&from=2027-03&to=2027-03&dest=FCO');
     expect(net.calls[0].searchParams.get('destination')).toBe('FCO');
-    expect(kv.data.has('estimates:TLV:2027-03:2027-03:FCO')).toBe(true);
+    expect(kv.data.has('estimates2:TLV:2027-03:2027-03:FCO')).toBe(true);
     await call('/oneways?origin=TLV&month=2027-03&dir=out&dest=FCO');
     expect(Object.fromEntries(net.calls[1].searchParams)).toMatchObject({ origin: 'TLV', destination: 'FCO', one_way: 'true' });
     await call('/oneways?origin=TLV&month=2027-03&dir=back&dest=FCO');

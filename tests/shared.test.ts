@@ -113,12 +113,18 @@ describe('Travelpayouts', () => {
     expect(same[0].estimate).toMatchObject({ confidence: 'estimate', price: 110, outTime: '07:00' });
   });
 
-  it('keeps at most eight options per airport', () => {
-    const data = Array.from({ length: 20 }, (_, i) => ({
-      destination_airport: 'ATH', price: 100 + i, departure_at: `2026-12-${String(i + 1).padStart(2, '0')}T06:00:00+02:00`,
-      return_at: `2026-12-${String(i + 6).padStart(2, '0')}T20:00:00+02:00`, transfers: 0, return_transfers: 0,
+  it("keeps at most sixty options per airport", () => {
+    const data = Array.from({ length: 80 }, (_, i) => ({
+      destination_airport: 'ATH', price: 100 + i, departure_at: `2026-12-${String((i % 28) + 1).padStart(2, '0')}T06:00:00+02:00`,
+      return_at: `2027-01-${String((i % 28) + 1).padStart(2, '0')}T20:00:00+02:00`, transfers: 0, return_transfers: 0,
     }));
-    expect(normalizeTravelpayouts({ data })).toHaveLength(8);
+    // 80 fares on 28 different date pairs: one option per pair of dates
+    expect(normalizeTravelpayouts({ data })).toHaveLength(28);
+    const many = Array.from({ length: 80 }, (_, i) => ({
+      destination_airport: 'ATH', price: 100 + i, departure_at: `2026-12-${String((i % 28) + 1).padStart(2, '0')}T06:00:00+02:00`,
+      return_at: `2027-${String(1 + Math.floor(i / 28)).padStart(2, '0')}-${String((i % 28) + 1).padStart(2, '0')}T20:00:00+02:00`, transfers: 0, return_transfers: 0,
+    }));
+    expect(normalizeTravelpayouts({ data: many })).toHaveLength(60);
   });
 
   it('copes with an empty or failed answer', () => {

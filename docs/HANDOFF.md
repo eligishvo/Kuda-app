@@ -149,6 +149,8 @@ price at all. Changes:
 - **Each selected airport is asked on its own** (`planCalls(s, selected).routes`, Worker `dest=` on
   `/estimates` and `/oneways`; up to 15 airports, free calls run 4 at a time). Single-route answers hold many
   more dates than the "everywhere" ones. Changing the destinations now marks the prices out of date.
+- Travelpayouts answers keep up to 60 date options per airport (was 8, which kept only the cheapest short trips
+  and threw away the longer ones). The Worker's cache key became `estimates2:` so old answers aren't reused.
 - **"Nothing that fits" list** under the results (`missingDestinations`): every selected airport without a
   fitting price, with the closest price found and why it doesn't fit ("16 days, back 6 Apr"), and Check live.
 - `scripts/diagnose-search.mjs` + `.github/workflows/diagnose-search.yml`: replay a search and print every price

@@ -56,8 +56,8 @@ export const HIDDEN_AIRPORTS = new Set([
 /** Airlines whose routes Google doesn't sell (A4 = Azimuth). */
 export const HIDDEN_AIRLINES = new Set(['A4']);
 
-/** How many date options are kept per airport from one Travelpayouts answer. */
-export const OPTIONS_PER_AIRPORT = 8;
+/** How many date options are kept per airport from one Travelpayouts answer (enough for a month of trips). */
+export const OPTIONS_PER_AIRPORT = 60;
 
 const clockOf = (stamp: string) => (/T\d{2}:\d{2}/.test(stamp) ? stamp.slice(11, 16) : undefined);
 

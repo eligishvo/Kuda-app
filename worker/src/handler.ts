@@ -178,7 +178,7 @@ export async function handle(request: Request, env: Env, deps: Deps = REAL): Pro
       const from = q.get('from');
       const to = q.get('to');
       if (!isMonth(from) || !isMonth(to)) throw new Problem('from and to must be months like 2026-12.', 400);
-      return await cached(env, deps, `estimates:${origin}:${from}:${to}${destKey}`, TTL.estimates, async () => {
+      return await cached(env, deps, `estimates2:${origin}:${from}:${to}${destKey}`, TTL.estimates, async () => {
         const data = normalizeTravelpayouts(await travelpayouts(env, deps, origin, from, to, dest));
         return { data, empty: data.length === 0 };
       });
