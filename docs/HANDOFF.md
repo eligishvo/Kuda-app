@@ -3,7 +3,7 @@
 Living status for whoever works on this next (person or AI). Keep it short and current.
 Spec: `docs/BRIEF.md`. Rules: `AGENTS.md`.
 
-## Status (2026-11-12)
+## Status (2026-11-13)
 
 **All phases of the brief are written, plus the owner's requests of 2026-11-12** (Adults setting, flying back
 from another airport, city names on the map, a search form with a Search button, a results list with filters,
@@ -205,6 +205,20 @@ QA fixes 2026-11-13 (owner's QA brief, four findings; all automated tests use fa
   airport (`pickDeparture`). The map's departure ring and trip pill, the Search summary, the price search
   (`planCalls(s).origin`) and live checks (`flightQuery`) all read the same field. Tests cover an old TLV + ETM
   search and an explicit switch to ETM.
+
+## How to test the QA fixes
+
+Zero-search checks first:
+1. Settings: the "Count return flights for every outbound flight" switch is gone.
+2. Search screen: "Fly from" allows one airport; TLV is chosen (an old TLV + Ramon search shows TLV). The button
+   reads "Search · up to N searches" and the note shows "N of 8 searches left today".
+3. Pick Ramon (ETM): the summary card and the map's trip pill say "From Ramon (ETM)", the ring moves to Eilat.
+   Switch back to TLV.
+4. After a search: open a destination from the map or the list. Nothing loads; the dates show with any estimate
+   and tick boxes; the allowance doesn't change. Turn Nonstop only on: a connecting-only airport leaves the map
+   and the list together, and the list's "Not in the list" says "Only flights with stops".
+Taps that can spend searches (each says its cost): Search; "Check these dates · up to N"; "See returns for this
+flight · up to 1"; "Count returns for N flights · up to N". Repeating any of them shows nothing new spent.
 
 ## How to test on a phone
 
