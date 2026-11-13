@@ -4,8 +4,11 @@ import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { addDays } from '../../shared/dates';
-import { airportLabel, airportsIn, countriesWithAirports } from '../map/mapData';
+import { airportCodesIn, airportLabel, airportsIn, countriesWithAirports } from '../map/mapData';
+import { allowanceText, costText } from '../flights/live';
+import { MAX_EXPLORE_CALLS, planCalls } from '../results/results';
 import { useResults } from '../results/useResults';
+import { selectedAirports } from '../selection/selection';
 import { daysText, lengthRange, LIMITS, nightsText, shortDate, travelersText } from '../search/search';
 import { useSelection } from '../selection/useSelection';
 import { useSearch } from '../search/SearchContext';
@@ -20,6 +23,9 @@ export default function SearchScreen() {
   const found = useResults();
   const [selection] = useSelection();
   const picked = Object.keys(selection).length;
+  // What tapping Search may cost: one Google Explore search per month, nothing when these prices are loaded already
+  const loaded = found.status === 'done' && found.results != null && !found.stale && !found.error;
+  const searchCost = loaded ? 0 : planCalls(search, selectedAirports(selection, airportCodesIn)).explore.length;
   const [picking, setPicking] = useState(false);
   const [filter, setFilter] = useState('');
   const today = new Date().toISOString().slice(0, 10);
@@ -173,10 +179,11 @@ export default function SearchScreen() {
         accessibilityRole="button"
         style={[styles.go, { backgroundColor: t.accent, opacity: found.status === 'loading' ? 0.6 : 1 }]}
       >
-        <Text style={[styles.goText, { color: t.buttonText }]}>{found.status === 'loading' ? 'Searching…' : 'Search'}</Text>
+        <Text style={[styles.goText, { color: t.buttonText }]}>{found.status === 'loading' ? 'Searching…' : `Search · ${costText(searchCost)}`}</Text>
       </Pressable>
       <Text style={[styles.small, { color: t.muted }]}>
-        Uses up to four of today’s Google searches (one per month in your dates); repeating the same search within 12 hours is free.
+        One Google search per month in your dates (at most {MAX_EXPLORE_CALLS}); the other price sources are free, and the
+        same search within 12 hours is free too.{found.usage ? ` ${allowanceText(found.usage)}.` : ''}
       </Text>
     </ScrollView>
   );

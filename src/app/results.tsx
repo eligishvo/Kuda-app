@@ -5,6 +5,7 @@ import { router } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 import { encodePairs } from '../flights/flights';
+import { allowanceText } from '../flights/live';
 import { defaultFilters, filterOptions, Filters, Option, originOf, priceText, Sort, stopsText, totalCost } from '../results/results';
 import { useResults } from '../results/useResults';
 import { daysText, lengthNote, lengthRange, LIMITS, Search, shortDate, travelersText } from '../search/search';
@@ -43,8 +44,8 @@ export default function ResultsScreen() {
     <View style={styles.missing}>
       <Text style={[styles.section, { color: t.text }]}>Nothing that fits for {found.missing.length} selected {found.missing.length === 1 ? 'airport' : 'airports'}</Text>
       <Text style={[styles.small, { color: t.muted }]}>
-        The price sources only know some dates. Here is the closest each one had; "Check live" asks Google for dates
-        inside your search (about 6 searches).
+        The price sources only know some dates. Here is the closest each one had; "See dates" opens the destination
+        for free, and you choose there which dates to check live (up to one search each).
       </Text>
       {found.missing.map((m) => (
         <View key={m.airport} style={[styles.row, { backgroundColor: t.panel, borderColor: t.border }]}>
@@ -57,7 +58,7 @@ export default function ResultsScreen() {
             </Text>
           </View>
           <Pressable onPress={() => checkLive(m.airport)} accessibilityRole="button" style={styles.liveBtn}>
-            <Text style={[styles.check, { color: t.text }]}>Check live ›</Text>
+            <Text style={[styles.check, { color: t.text }]}>See dates ›</Text>
           </Pressable>
         </View>
       ))}
@@ -77,7 +78,7 @@ export default function ResultsScreen() {
       </Text>
       <Text style={[styles.small, { color: t.muted }]}>
         {shortDate(search.earliestOut)} – {shortDate(search.latestRet)} · {travelersText(search.adults)}
-        {found.usage ? ` · ${Math.max(0, found.usage.cap - found.usage.used)} searches left today` : ''}
+        {found.usage ? ` · ${allowanceText(found.usage)}` : ''}
       </Text>
       {found.error && <Text style={[styles.small, { color: t.price }]}>{found.error}</Text>}
       {found.stale && !loading && (

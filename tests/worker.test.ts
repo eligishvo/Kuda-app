@@ -91,7 +91,7 @@ describe('Worker: endpoints', () => {
     const { call, net } = setup();
     const r = await call('/explore?origin=TLV&month=12&duration=2&area=/m/035qy');
     expect(r.status).toBe(200);
-    expect(r.body).toMatchObject({ ok: true, cached: false, usage: { date: '2026-11-12', used: 1, cap: 40 } });
+    expect(r.body).toMatchObject({ ok: true, cached: false, usage: { date: '2026-11-12', used: 1, cap: 8 } });
     expect(r.body.data.map((d: any) => d.airport)).toEqual(['FCO', 'ATH', 'LGW']);
     const p = net.calls[0].searchParams;
     expect(net.calls[0].hostname).toBe('serpapi.com');
@@ -240,9 +240,9 @@ describe('Worker: daily cap', () => {
     expect((await call('/usage')).body.data).toEqual({ date: '2026-11-12', used: 2, cap: 2 });
   });
 
-  it('uses 40 a day when no cap is set, and reports a missing key clearly', async () => {
+  it('uses 8 a day when no cap is set, and reports a missing key clearly', async () => {
     const { call } = setup({ SERPAPI_KEY: undefined });
-    expect((await call('/usage')).body.data.cap).toBe(40);
+    expect((await call('/usage')).body.data.cap).toBe(8);
     const r = await call('/explore?origin=TLV&month=12&duration=2');
     expect(r.status).toBe(500);
     expect(r.body.error).toMatch(/SERPAPI_KEY/);

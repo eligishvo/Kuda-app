@@ -16,7 +16,7 @@ caches answers in Cloudflare KV, and stops after a set number of SerpApi searche
 Every request needs the header `X-App-Token: <APP_TOKEN>`. Every answer looks like
 `{ ok, data, cached, usage: { date, used, cap } }` or `{ ok: false, error }`. The types are in `shared/types.ts`.
 Only SerpApi searches that actually go out count against the cap (cached answers and Travelpayouts are free).
-The cap is `DAILY_SEARCH_CAP` in `wrangler.toml` (default 40) and resets at midnight UTC.
+The daily limit is `DAILY_SEARCH_CAP` in `wrangler.toml` (8, so a month stays under the 250-search plan; 8 if unset) and resets at midnight UTC. `/usage` reads it without spending a search.
 
 ## Deploy — the easy way (GitHub Action)
 

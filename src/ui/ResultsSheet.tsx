@@ -1,5 +1,6 @@
 // The results panel at the bottom of the map: destinations within budget, cheapest first, then the
 // selected airports that have no estimate for the dates. Tapping a row moves the map there.
+import { allowanceText } from '../flights/live';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Usage } from '../../shared/types';
@@ -53,7 +54,7 @@ export function ResultsSheet({ theme: t, results, loading, progress, error, usag
         <Text style={[styles.note, { color: t.muted }]}>
           {[
             results.overBudget > 0 ? `${results.overBudget} more cost over $${budget}` : '',
-            usage ? `${Math.max(0, usage.cap - usage.used)} searches left today` : '',
+            allowanceText(usage),
           ].filter(Boolean).join(' · ') || 'Prices are per person, round trip.'}
         </Text>
       )}
@@ -61,7 +62,7 @@ export function ResultsSheet({ theme: t, results, loading, progress, error, usag
         <Text style={[styles.note, { color: t.muted }]}>Nothing fits these dates and budget. Try a wider window or a higher budget.</Text>
       )}
       {!loading && list.length > 0 && (
-        <Text style={[styles.note, { color: t.muted }]}>Tap a destination, then "Compare flights" for live times and prices (uses about 6 searches: 3 dates, plus counting returns for each).</Text>
+        <Text style={[styles.note, { color: t.muted }]}>Tap a destination, then "Compare flights" to see its dates (free). Live prices are checked only when you tap Check there, up to one search per date pair.</Text>
       )}
       <ScrollView style={styles.list}>
         {list.map((r) => {
@@ -94,7 +95,7 @@ export function ResultsSheet({ theme: t, results, loading, progress, error, usag
                     accessibilityRole="button"
                     style={[styles.open, { backgroundColor: t.accent }]}
                   >
-                    <Text style={[styles.openText, { color: t.buttonText }]}>{e ? 'Compare flights' : 'Check flights'}</Text>
+                    <Text style={[styles.openText, { color: t.buttonText }]}>{e ? 'Compare flights' : 'See dates'}</Text>
                   </Pressable>
                 )}
               </View>

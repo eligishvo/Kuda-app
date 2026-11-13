@@ -515,3 +515,13 @@ export function missingDestinations(
     .sort((a, b) => a.score - b.score || a.city.localeCompare(b.city))
     .map(({ score: _score, ...m }) => m);
 }
+
+/**
+ * The cheapest price list fare for exactly these dates on this route (arrive at `code`, fly home from
+ * `back`), for showing next to a date pair before anything is checked live. Undefined when none matches.
+ */
+export function estimateFor(options: Option[], code: string, back: string, p: { out: string; ret: string }): Option | undefined {
+  return options
+    .filter((o) => o.airport === code && (o.back?.airport ?? o.airport) === back && o.estimate.outDate === p.out && o.estimate.retDate === p.ret)
+    .sort((a, b) => a.estimate.price - b.estimate.price)[0];
+}

@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { addDays } from '../../shared/dates';
 import { ApiResult, Itinerary, Usage } from '../../shared/types';
+import { live } from '../flights/live';
 import { api, Connection } from '../api/client';
 import { useSearch } from '../search/SearchContext';
 import { KEYS, load, save } from '../storage/store';
@@ -53,6 +54,7 @@ export default function Debug() {
     const seconds = ((Date.now() - started) / 1000).toFixed(1);
     setBusy('');
     if (r.usage) setUsage(r.usage);
+    live.noteUsage(r.usage);
     if (!r.ok) {
       setShown({ title, ok: false, line: `Failed after ${seconds}s`, json: r.error });
       return;

@@ -31,7 +31,7 @@ Built in phase 2:
   the date-window filter (`fitsWindow`, `monthsInWindow`, `durationBucket`) and the normalizers for SerpApi Explore,
   SerpApi Google Flights and Travelpayouts.
 - `worker/`: Cloudflare Worker with `/explore`, `/estimates`, `/flights`, `/returns`, `/usage`; KV cache (12 h for
-  Explore and estimates, 1 h for flights); daily SerpApi cap (`DAILY_SEARCH_CAP`, default 40); `X-App-Token` check.
+  Explore and estimates, 1 h for flights); daily SerpApi limit (`DAILY_SEARCH_CAP`, 8 since the QA fixes; was 40); `X-App-Token` check.
   Deploy steps are in `worker/README.md`; `.github/workflows/worker.yml` deploys it from repo secrets.
 - App: `src/api/client.ts` and a debug screen (Settings → Flight data (debug)) that calls every endpoint for TLV
   and prints the normalized result, timing, cached or fresh, and the searches left today.
@@ -137,7 +137,8 @@ Added 2026-11-13: **return flights counted** (owner's request):
   of each date is counted automatically; "Count returns for the other N flights (N searches)" does the rest of
   the visible list; Settings → Trip → "Count return flights for every outbound flight" does the first five of
   each date automatically. Returns already loaded are never searched again in the same visit.
-- Opening a destination now uses up to 6 searches (3 dates + 3 counts); from a results-list line, 2.
+- Opening a destination then used up to 6 searches (3 dates + 3 counts). **Replaced by the QA fixes below:** nothing
+  is searched or counted without a tap that shows the cost.
 
 Fixed 2026-11-13: **searches found too little** (owner: many airports selected, 10–14 days in March, one
 result). The "Diagnose search" workflow replayed it with real answers: nothing was dropped for price; almost every
@@ -166,6 +167,20 @@ Added 2026-11-13: **flexible trip length** (owner chose "option 1" of three ways
   forbids use "for metasearch purposes" (2.5(d)) and grants use "solely for your business operations" (1.1),
   which a personal price-comparison app may not fit; the suggestion was to ask help@duffel.com first. The
   "Test Duffel" workflow and `scripts/test-duffel.mjs` are ready but no `DUFFEL_TOKEN` secret exists.
+
+QA fixes 2026-11-13 (owner's QA brief, four findings; all automated tests use fake data, zero live searches):
+- **1. Live search costs are predictable.** Opening a destination spends nothing: it shows the date pairs with
+  any price-list estimate for exactly those dates, ticked boxes to choose which to check, and one button,
+  "Check these dates · up to N searches". Picking an outbound flight is free; its returns load only on "See
+  returns for this flight · up to 1 search"; "Count returns for N flights · up to N searches" is the batch.
+  Changing "Fly back from" searches nothing. Every live answer is remembered while the app is open
+  (`src/flights/live.ts`), so reopening a date or a return list costs nothing. The Settings switch that counted
+  returns automatically is gone and its saved value (`kuda.countReturns`) is no longer read, so old installs
+  stop too. The Worker's daily limit is now 8 (`DAILY_SEARCH_CAP` in `worker/wrangler.toml`, 8 if unset: 8 × 31
+  = 248 fits the 250-a-month plan). Every screen shows the Worker's own "N of 8 searches left today", read from
+  the free `/usage` (`useAllowance`). Search shows "Search · up to N searches" (N = months, at most 4) and
+  repeating an unchanged search reuses the loaded prices without calling the Worker. Tests: `tests/live.test.ts`
+  runs the app's client against the real Worker code with a fake SerpApi.
 
 ## How to test on a phone
 
@@ -295,8 +310,8 @@ rings on the map should follow. Close and reopen the app: the search should stil
 - **While results show, map taps don't change the destinations** (only pins respond); "Destinations" goes back.
 - **"No estimate — tap to check":** a pin tap highlights the row; the row's "Check flights" button opens the
   destination screen, which runs the live checks.
-- **Opening a destination spends up to 6 searches without asking** (3 live date checks, as the brief describes,
-  plus one return count per date since 2026-11-13); the screen shows how many are left. Returns are loaded only when an outbound flight is tapped.
+- **Opening a destination spends no searches** (QA fix, 2026-11-13; the brief had it check 3 dates on opening).
+  Live checks and return lists are buttons that show their cost ("up to N searches").
 - **Live checks use the first departure airport and the search's number of travelers.**
 - **Calendar:** written in the app (`src/ui/Calendar.tsx`) instead of adding a date-picker library, so it follows
   the themes and needs no native code. Weeks start on Sunday.
@@ -307,9 +322,9 @@ rings on the map should follow. Close and reopen the app: the search should stil
 - **Travelpayouts picks one fare per airport:** nonstop before connecting, then the cheapest. Filtering by the
   user's window happens in the app (phase 3), so a fare outside the window can hide one inside it; if that shows
   up in practice, move the window into the `/estimates` call.
-- **Daily cap vs the SerpApi plan:** the Worker allows 40 searches a day (`DAILY_SEARCH_CAP`), but the free
-  plan has 250 a month (about 8 a day), so heavy use can run out mid-month. Raised with the owner on
-  2026-11-13; not changed yet.
+- **Daily limit vs the SerpApi plan:** the Worker allows 8 searches a day (`DAILY_SEARCH_CAP`), which keeps a
+  month under the current 250-search plan (QA brief, 2026-11-13; was 40). If the plan changes, change the number
+  in `worker/wrangler.toml` and push.
 - **The cap counts searches sent**, including ones SerpApi answers with an error. It is kept in KV, which is not
   exact under simultaneous calls; with one user that is fine.
 - **Brief corrected:** repo name `eligishvo/Kuda` → `eligishvo/Kuda-app` (the real repo). No decision changed.
@@ -330,6 +345,8 @@ None recorded yet (nothing has run on a phone).
 
 ## Changelog
 
+- **2026-11-13** — QA fix 1: opening a destination is free; live checks and returns only on a tap that shows
+  the cost; automatic return counting removed; Worker daily limit 8; real allowance shown everywhere. 170 tests.
 - **2026-11-13** — Duffel and a paid SerpApi plan put on hold by the owner; Test Duffel workflow kept.
 - **2026-11-13** — Flexible trip length (±N days, default ±2). 165 tests. Published as an update.
 - **2026-11-13** — Search coverage fix after a real search found one result: same-airport two-ticket trips,

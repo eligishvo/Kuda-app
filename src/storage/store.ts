@@ -1,7 +1,9 @@
 // Small wrapper around the phone's key-value storage: values are saved as JSON and reads never throw.
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-export const KEYS = { theme: 'kuda.theme', selection: 'kuda.selection', connection: 'kuda.connection', search: 'kuda.search', trip: 'kuda.trip', trips: 'kuda.trips', countReturns: 'kuda.countReturns' };
+export const KEYS = { theme: 'kuda.theme', selection: 'kuda.selection', connection: 'kuda.connection', search: 'kuda.search', trip: 'kuda.trip', trips: 'kuda.trips' };
+// 'kuda.countReturns' (an old setting that counted returns automatically) is no longer read anywhere: returns
+// are only loaded when you tap for them, on old installs too.
 
 export async function load<T>(key: string, fallback: T): Promise<T> {
   try {

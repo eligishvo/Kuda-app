@@ -25,7 +25,8 @@ export type Env = {
 
 export type Deps = { fetch: typeof fetch; now: () => Date };
 
-export const DEFAULT_CAP = 40;
+/** Most SerpApi searches a day when DAILY_SEARCH_CAP isn't set: 8 a day keeps a month under the 250-search plan. */
+export const DEFAULT_CAP = 8;
 const HOUR = 3600;
 /** How long answers are kept. Explore prices move slowly; live flight prices don't. */
 export const TTL = { explore: 12 * HOUR, estimates: 12 * HOUR, flights: HOUR, returns: HOUR, empty: HOUR, usage: 3 * 24 * HOUR };

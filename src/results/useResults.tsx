@@ -3,6 +3,8 @@
 import { createContext, ReactNode, useCallback, useContext, useMemo, useRef, useState } from 'react';
 import { Destination, OneWay, Usage } from '../../shared/types';
 import { api, Connection } from '../api/client';
+import { live } from '../flights/live';
+import { useAllowance } from '../flights/useAllowance';
 import { airportByCode, airportCodesIn } from '../map/mapData';
 import { Search } from '../search/search';
 import { useSearch } from '../search/SearchContext';
@@ -52,12 +54,15 @@ export function ResultsProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<ResultsState['status']>('idle');
   const [progress, setProgress] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [usage, setUsage] = useState<Usage | null>(null);
+  // The Worker's own count of today's searches, shared with every screen (reading it is free)
+  const usage = useAllowance();
   const [raw, setRaw] = useState<Raw | null>(null);
   const running = useRef(false);
 
   const run = useCallback(async () => {
     if (running.current) return;
+    // The same search again reuses what was loaded: no Worker calls at all
+    if (raw && raw.key === callsKey(search, selected) && !error) return;
     running.current = true;
     setStatus('loading');
     setError(null);
@@ -78,7 +83,7 @@ export function ResultsProvider({ children }: { children: ReactNode }) {
     let problem: string | null = null;
     const note = (r: { ok: boolean; error?: string; usage?: Usage }) => {
       if (!r.ok) problem = problem ?? r.error ?? 'A price check failed.';
-      if (r.usage) setUsage(r.usage);
+      live.noteUsage(r.usage);
     };
     // Free calls (Travelpayouts): to everywhere, then each selected airport on its own
     const free: (() => Promise<void>)[] = [];
@@ -116,7 +121,7 @@ export function ResultsProvider({ children }: { children: ReactNode }) {
     setProgress('');
     setStatus('done');
     running.current = false;
-  }, [search, selected]);
+  }, [search, selected, raw, error]);
 
   // Changing the budget or filters re-filters what was fetched without a new search
   const same = useMemo(() => (raw ? buildSameAirport(search, selected, raw.outs, raw.backs, airportByCode) : []), [raw, search, selected]);

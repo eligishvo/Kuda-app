@@ -4,8 +4,9 @@ compatibility_date = "2025-09-01"
 workers_dev = true
 
 [vars]
-# Most SerpApi searches per day (the free plan has 250 a month). Change it and redeploy.
-DAILY_SEARCH_CAP = "40"
+# Daily limit: the most SerpApi searches the Worker makes per day (resets at midnight UTC). The current plan has
+# 250 searches a month, and 8 a day x 31 days = 248 stays inside it. Change it here and push to redeploy.
+DAILY_SEARCH_CAP = "8"
 
 # The cache and the daily counter. With no id here, wrangler creates the KV namespace on the first deploy.
 [[kv_namespaces]]
