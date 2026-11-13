@@ -32,9 +32,9 @@ export const api = {
   usage: (c: Connection, f?: typeof fetch) => get<Usage>(c, '/usage', f),
   explore: (c: Connection, p: { origin: string; month: number; duration: 1 | 2 | 3; adults?: number; area?: string }, f?: typeof fetch) =>
     get<Destination[]>(c, `/explore${query(p)}`, f),
-  estimates: (c: Connection, p: { origin: string; from: string; to: string }, f?: typeof fetch) =>
+  estimates: (c: Connection, p: { origin: string; from: string; to: string; dest?: string }, f?: typeof fetch) =>
     get<Destination[]>(c, `/estimates${query(p)}`, f),
-  oneWays: (c: Connection, p: { origin: string; month: string; dir: 'out' | 'back' }, f?: typeof fetch) =>
+  oneWays: (c: Connection, p: { origin: string; month: string; dir: 'out' | 'back'; dest?: string }, f?: typeof fetch) =>
     get<OneWay[]>(c, `/oneways${query(p)}`, f),
   flights: (c: Connection, p: FlightQuery, f?: typeof fetch) =>
     get<Itinerary[]>(c, `/flights${query({ ...p, back: p.back && p.back !== p.dest ? p.back : undefined })}`, f),

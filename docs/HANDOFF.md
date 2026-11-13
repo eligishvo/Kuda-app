@@ -139,6 +139,21 @@ Added 2026-11-13: **return flights counted** (owner's request):
   each date automatically. Returns already loaded are never searched again in the same visit.
 - Opening a destination now uses up to 6 searches (3 dates + 3 counts); from a results-list line, 2.
 
+Fixed 2026-11-13: **searches found too little** (owner: many airports selected, 10–14 days in March, one
+result). The "Diagnose search" workflow replayed it with real answers: nothing was dropped for price; almost every
+price was dropped for its dates. Google Explore gives one trip per destination per month and picks the length
+itself (13–16 days, some ending in April); Aviasales' cache is mostly 2–7 day trips; 8 selected airports had no
+price at all. Changes:
+- **Two one-way tickets to the same airport** (`buildSameAirport`): one-way fares (always fetched now, free)
+  paired out + back when the length fits. Shown as "two one-way tickets", also used for the map's pins.
+- **Each selected airport is asked on its own** (`planCalls(s, selected).routes`, Worker `dest=` on
+  `/estimates` and `/oneways`; up to 15 airports, free calls run 4 at a time). Single-route answers hold many
+  more dates than the "everywhere" ones. Changing the destinations now marks the prices out of date.
+- **"Nothing that fits" list** under the results (`missingDestinations`): every selected airport without a
+  fitting price, with the closest price found and why it doesn't fit ("16 days, back 6 Apr"), and Check live.
+- `scripts/diagnose-search.mjs` + `.github/workflows/diagnose-search.yml`: replay a search and print every price
+  with the reason it was kept or dropped. Replaying within 12 hours of the app's search costs no searches.
+
 ## How to test on a phone
 
 1. In the repo folder: `git pull`, `npm install`, `npx expo start`.
@@ -299,6 +314,8 @@ None recorded yet (nothing has run on a phone).
 
 ## Changelog
 
+- **2026-11-13** — Search coverage fix after a real search found one result: same-airport two-ticket trips,
+  per-airport free calls, "Nothing that fits" list with reasons, Diagnose search workflow. 159 tests.
 - **2026-11-13** — Return flights counted per outbound flight and per date option on the destination screen;
   setting to count them all automatically. 152 tests. Published as an update.
 - **2026-11-13** — Trip planner version 1: trips started from chosen flights, with Plan, Stay, Budget, List and

@@ -3,7 +3,10 @@ import { hitPin } from '../src/map/hitTest';
 import { airportByCode, airportLabel } from '../src/map/mapData';
 import { labelLimit, Pin, PIN_H, PIN_LIFT, PIN_W, pinShows } from '../src/map/pins';
 import { makeView, project } from '../src/map/projection';
-import { buildMixed, buildOptions, buildResults, defaultFilters, filterOptions, originOf, planCalls, priceText, stopsText, totalCost } from '../src/results/results';
+import {
+  asDestinations, buildMixed, buildOptions, buildResults, buildSameAirport, defaultFilters, filterOptions, mergeOptions, missingDestinations, originOf, planCalls,
+  priceText, stopsText, totalCost,
+} from '../src/results/results';
 import { defaultSearch, Search } from '../src/search/search';
 import { normalizeExplore, normalizeOneWays, normalizeTravelpayouts } from '../shared/normalize';
 import { Destination } from '../shared/types';
@@ -20,9 +23,14 @@ const build = (s: Search, selected: string[], ex = explore, es = estimates) => b
 
 describe('planning the calls', () => {
   it('asks Google once per month you could leave in, with the matching trip length', () => {
-    expect(planCalls({ ...search, mixAirports: false })).toEqual({ explore: [{ month: 12, duration: 2 }], estimates: [{ from: '2026-12', to: '2026-12' }], oneWays: [] });
-    // With "return from another airport" on, the free one-way fares are asked for too
-    expect(planCalls(search).oneWays).toEqual([{ month: '2026-12', dir: 'out' }, { month: '2026-12', dir: 'back' }]);
+    expect(planCalls(search)).toEqual({
+      explore: [{ month: 12, duration: 2 }],
+      estimates: [{ from: '2026-12', to: '2026-12' }],
+      // One-way fares are always asked for (free): two tickets often make a trip the round-trip lists miss
+      oneWays: [{ month: '2026-12', dir: 'out' }, { month: '2026-12', dir: 'back' }],
+      routes: [],
+    });
+    expect(planCalls({ ...search, mixAirports: false }).oneWays).toHaveLength(2);
   });
 
   it('covers a window that runs into the next month', () => {
@@ -38,6 +46,17 @@ describe('planning the calls', () => {
     const p = planCalls({ ...search, earliestOut: '2026-12-26', latestRet: '2027-01-04' });
     expect(p.explore).toEqual([{ month: 12, duration: 2 }]);
     expect(p.estimates).toEqual([{ from: '2026-12', to: '2026-12' }, { from: '2026-12', to: '2027-01' }]);
+  });
+
+  it('asks the free sources again for each selected airport on its own, up to fifteen', () => {
+    const p = planCalls(search, ['VIE', 'ATH', 'VIE']);
+    expect(p.routes).toEqual([
+      { dest: 'ATH', estimates: [{ from: '2026-12', to: '2026-12' }], oneWays: [{ month: '2026-12', dir: 'out' }, { month: '2026-12', dir: 'back' }] },
+      { dest: 'VIE', estimates: [{ from: '2026-12', to: '2026-12' }], oneWays: [{ month: '2026-12', dir: 'out' }, { month: '2026-12', dir: 'back' }] },
+    ]);
+    expect(p.explore).toEqual(planCalls(search).explore); // no extra Google searches
+    const many = Array.from({ length: 30 }, (_, i) => `A${String.fromCharCode(65 + (i % 26))}${i < 26 ? 'A' : 'B'}`);
+    expect(planCalls(search, many).routes).toHaveLength(15);
   });
 
   it('never plans more than four Google searches', () => {
@@ -195,6 +214,59 @@ describe('flying home from a different airport', () => {
     const f = defaultFilters(search);
     expect(filterOptions(all, f).some((o) => o.back)).toBe(true);
     expect(filterOptions(all, { ...f, mixed: false }).some((o) => o.back)).toBe(false);
+  });
+});
+
+describe('trips made of two one-way tickets to the same airport', () => {
+  // The March search that found too little: 10–14 days in March
+  const march = { ...search, earliestOut: '2027-03-01', latestRet: '2027-03-31', minNights: 10, maxNights: 14, budget: 450 };
+  const ow = (airport: string, date: string, price: number, stops = 0) => ({ airport, date, price, stops, confidence: (stops === 0 ? 'estimate' : 'rough') as 'estimate' | 'rough', time: '06:00' });
+  const outs = [[ow('FCO', '2027-03-01', 69), ow('FCO', '2027-03-07', 66), ow('FCO', '2027-03-10', 69), ow('VIE', '2027-03-02', 90)]];
+  const backs = [[ow('FCO', '2027-03-17', 68), ow('FCO', '2027-03-09', 67), ow('VIE', '2027-03-30', 95, 1)]];
+
+  it('pairs a fare out with a fare back from the same airport when the length fits', () => {
+    const same = buildSameAirport(march, [], outs, backs, airportByCode);
+    // Only out on the 7th and back on the 17th is 10–14 days; the others are 2, 7, 8, 16 or 28 days
+    expect(same.map((o) => `${o.airport} ${o.estimate.outDate.slice(8)}-${o.estimate.retDate.slice(8)} ${o.estimate.nights} $${o.estimate.price}`)).toEqual(['FCO 07-17 10 $134']);
+    expect(same[0]).toMatchObject({ split: true, kind: 'estimate', estimate: { source: 'travelpayouts', stops: 0, outTime: '06:00', retTime: '06:00' } });
+    expect(same.every((o) => !o.back)).toBe(true);
+  });
+
+  it('marks a trip rough when either ticket has a connection, and respects the selection', () => {
+    const wide = { ...march, minNights: 5, maxNights: 30 };
+    expect(buildSameAirport(wide, ['VIE'], outs, backs, airportByCode).map((o) => [o.airport, o.kind])).toEqual([['VIE', 'rough']]);
+    expect(buildSameAirport(wide, ['ATH'], outs, backs, airportByCode)).toEqual([]);
+  });
+
+  it('feeds the map too, and merges with round trips without duplicates', () => {
+    const same = buildSameAirport(march, [], outs, backs, airportByCode);
+    expect(asDestinations(same)[0]).toMatchObject({ airport: 'FCO', estimate: { price: 134 } });
+    const twice = mergeOptions([same, same]);
+    expect(twice).toHaveLength(same.length);
+    const live = { ...same[0], kind: 'live' as const, estimate: { ...same[0].estimate, price: 120, confidence: 'live' as const, source: 'explore' as const } };
+    expect(mergeOptions([same, [live]]).find((o) => o.estimate.outDate === '2027-03-07')?.kind).toBe('live');
+  });
+});
+
+describe('selected airports with nothing that fits', () => {
+  const march = { ...search, earliestOut: '2027-03-01', latestRet: '2027-03-31', minNights: 10, maxNights: 14, budget: 450 };
+  const est = (airport: string, outDate: string, retDate: string, price: number, confidence: 'live' | 'estimate' = 'live') => ({
+    airport, city: airport, estimate: { source: (confidence === 'live' ? 'explore' : 'travelpayouts') as 'explore' | 'travelpayouts', confidence, price, outDate, retDate, nights: Math.round((Date.parse(retDate) - Date.parse(outDate)) / 86400000), stops: 0 },
+  });
+  // What the real search returned for Vienna and Amsterdam, and a fitting Rome trip
+  const lists = [[est('VIE', '2027-03-21', '2027-04-06', 294), est('AMS', '2027-03-29', '2027-04-13', 411), est('FCO', '2027-03-05', '2027-03-18', 124)], [est('VIE', '2027-03-15', '2027-03-19', 351, 'estimate')]];
+
+  it('names each one with the closest price and why it doesn’t fit, closest first', () => {
+    const options = buildOptions(march, ['VIE', 'AMS', 'FCO', 'GRZ'], lists, [], airportByCode);
+    const missing = missingDestinations(march, ['VIE', 'AMS', 'FCO', 'GRZ'], lists, options, airportByCode);
+    expect(missing.map((m) => m.airport)).toEqual(['VIE', 'AMS', 'GRZ']);
+    expect(missing[0]).toMatchObject({ city: 'Vienna', near: { kind: 'estimate', why: '4 days', estimate: { price: 351 } } });
+    expect(missing[1].near?.why).toBe('15 days, back 13 Apr');
+    expect(missing[2].near).toBeUndefined();
+  });
+
+  it('is empty when nothing was selected', () => {
+    expect(missingDestinations(march, [], lists, [], airportByCode)).toEqual([]);
   });
 });
 

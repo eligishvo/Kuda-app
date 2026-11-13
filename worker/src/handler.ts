@@ -88,10 +88,12 @@ async function serpapi(env: Env, deps: Deps, params: Record<string, string>): Pr
   return body;
 }
 
-async function travelpayouts(env: Env, deps: Deps, origin: string, from: string, to: string): Promise<any> {
+/** Cached round trips from the origin: to everywhere, or to one destination when `dest` is given. */
+async function travelpayouts(env: Env, deps: Deps, origin: string, from: string, to: string, dest = ''): Promise<any> {
   if (!env.TRAVELPAYOUTS_TOKEN) throw new Problem('The Worker has no TRAVELPAYOUTS_TOKEN secret yet.', 500);
   const url = new URL('https://api.travelpayouts.com/aviasales/v3/prices_for_dates');
-  const params = { origin, departure_at: from, return_at: to, one_way: 'false', unique: 'false', sorting: 'price', limit: '1000', currency: 'usd', token: env.TRAVELPAYOUTS_TOKEN };
+  const params: Record<string, string> = { origin, departure_at: from, return_at: to, one_way: 'false', unique: 'false', sorting: 'price', limit: '1000', currency: 'usd', token: env.TRAVELPAYOUTS_TOKEN };
+  if (dest) params.destination = dest;
   for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
   const res = await deps.fetch(url.toString());
   const body: any = await res.json().catch(() => null);
@@ -99,11 +101,15 @@ async function travelpayouts(env: Env, deps: Deps, origin: string, from: string,
   return body;
 }
 
-/** One-way fares for a month: from the airport to everywhere ('out') or from everywhere to it ('back'). */
-async function oneWays(env: Env, deps: Deps, airport: string, month: string, dir: 'out' | 'back'): Promise<any> {
+/**
+ * One-way fares for a month: from the airport to everywhere ('out') or from everywhere to it ('back').
+ * With `dest`, only between the airport and that destination (many more dates for that one route).
+ */
+async function oneWays(env: Env, deps: Deps, airport: string, month: string, dir: 'out' | 'back', dest = ''): Promise<any> {
   if (!env.TRAVELPAYOUTS_TOKEN) throw new Problem('The Worker has no TRAVELPAYOUTS_TOKEN secret yet.', 500);
   const url = new URL('https://api.travelpayouts.com/aviasales/v3/prices_for_dates');
-  const params = { [dir === 'out' ? 'origin' : 'destination']: airport, departure_at: month, one_way: 'true', unique: 'false', sorting: 'price', limit: '1000', currency: 'usd', token: env.TRAVELPAYOUTS_TOKEN };
+  const params: Record<string, string> = { [dir === 'out' ? 'origin' : 'destination']: airport, departure_at: month, one_way: 'true', unique: 'false', sorting: 'price', limit: '1000', currency: 'usd', token: env.TRAVELPAYOUTS_TOKEN };
+  if (dest) params[dir === 'out' ? 'destination' : 'origin'] = dest;
   for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
   const res = await deps.fetch(url.toString());
   const body: any = await res.json().catch(() => null);
@@ -161,12 +167,19 @@ export async function handle(request: Request, env: Env, deps: Deps = REAL): Pro
       });
     }
 
+    // Optional on /estimates and /oneways: one destination airport instead of everywhere
+    const dest = q.get('dest') ?? '';
+    if (dest && !iata(dest) && url.pathname !== '/flights' && url.pathname !== '/returns' && url.pathname !== '/booking') {
+      throw new Problem('dest must be a 3-letter airport code.', 400);
+    }
+    const destKey = dest ? `:${dest}` : '';
+
     if (url.pathname === '/estimates') {
       const from = q.get('from');
       const to = q.get('to');
       if (!isMonth(from) || !isMonth(to)) throw new Problem('from and to must be months like 2026-12.', 400);
-      return await cached(env, deps, `estimates:${origin}:${from}:${to}`, TTL.estimates, async () => {
-        const data = normalizeTravelpayouts(await travelpayouts(env, deps, origin, from, to));
+      return await cached(env, deps, `estimates:${origin}:${from}:${to}${destKey}`, TTL.estimates, async () => {
+        const data = normalizeTravelpayouts(await travelpayouts(env, deps, origin, from, to, dest));
         return { data, empty: data.length === 0 };
       });
     }
@@ -176,8 +189,8 @@ export async function handle(request: Request, env: Env, deps: Deps = REAL): Pro
       const dir = q.get('dir');
       if (!isMonth(month)) throw new Problem('month must be like 2026-12.', 400);
       if (dir !== 'out' && dir !== 'back') throw new Problem('dir must be out or back.', 400);
-      return await cached(env, deps, `oneways:${origin}:${month}:${dir}`, TTL.estimates, async () => {
-        const data = normalizeOneWays(await oneWays(env, deps, origin, month, dir), dir);
+      return await cached(env, deps, `oneways:${origin}:${month}:${dir}${destKey}`, TTL.estimates, async () => {
+        const data = normalizeOneWays(await oneWays(env, deps, origin, month, dir, dest), dir);
         return { data, empty: data.length === 0 };
       });
     }

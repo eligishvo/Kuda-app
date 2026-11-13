@@ -9,12 +9,19 @@ import { useSearch } from '../search/SearchContext';
 import { selectedAirports } from '../selection/selection';
 import { useSelection } from '../selection/useSelection';
 import { KEYS, load } from '../storage/store';
-import { buildMixed, buildOptions, buildResults, Option, planCalls, Results } from './results';
+import {
+  asDestinations, buildMixed, buildOptions, buildResults, buildSameAirport, mergeOptions, Missing, missingDestinations, Option, planCalls, Results,
+} from './results';
 
 type Raw = { explore: Destination[][]; estimates: Destination[][]; outs: OneWay[][]; backs: OneWay[][]; key: string };
 
-/** Two searches with the same key need the same Worker calls (same origin, months, trip length, options). */
-const callsKey = (s: Search) => JSON.stringify([s.departureAirports[0], planCalls(s)]);
+/** Two searches with the same key need the same Worker calls (same origin, months, trip length, destinations). */
+const callsKey = (s: Search, selected: string[]) => JSON.stringify([s.departureAirports[0], planCalls(s, selected)]);
+
+/** Runs jobs a few at a time (the free calls), so a search with many airports doesn't take too long. */
+async function inBatches<T>(jobs: (() => Promise<T>)[], size: number): Promise<void> {
+  for (let i = 0; i < jobs.length; i += size) await Promise.all(jobs.slice(i, i + size).map((j) => j()));
+}
 
 export type ResultsState = {
   status: 'idle' | 'loading' | 'done';
@@ -25,8 +32,10 @@ export type ResultsState = {
   usage: Usage | null;
   /** For the map: the best price per destination, within budget. */
   results: Results | null;
-  /** For the list: every dated option, including trips that return from another airport. */
+  /** For the list: every dated option, including two-ticket trips and trips that return from another airport. */
   options: Option[];
+  /** Selected airports with nothing that fits, with the closest price found and why it doesn't fit. */
+  missing: Missing[];
   /** True when the dates, trip length or departure changed since these prices were fetched. */
   stale: boolean;
   /** Every price list that was fetched (Google's first), for suggesting dates to check live. */
@@ -59,67 +68,80 @@ export function ResultsProvider({ children }: { children: ReactNode }) {
       running.current = false;
       return;
     }
-    const plan = planCalls(search);
+    const plan = planCalls(search, selected);
     // Prices are asked from the first departure airport, for one adult (so they are per person)
     const origin = search.departureAirports[0];
-    const total = plan.estimates.length + plan.oneWays.length + plan.explore.length;
     const explore: Destination[][] = [];
     const estimates: Destination[][] = [];
     const outs: OneWay[][] = [];
     const backs: OneWay[][] = [];
     let problem: string | null = null;
-    let step = 0;
     const note = (r: { ok: boolean; error?: string; usage?: Usage }) => {
       if (!r.ok) problem = problem ?? r.error ?? 'A price check failed.';
       if (r.usage) setUsage(r.usage);
     };
-    // Free calls first, then the Google Explore calls that count against the daily limit
-    for (const e of plan.estimates) {
-      setProgress(`Checking prices ${++step} of ${total}`);
-      const r = await api.estimates(conn, { origin, from: e.from, to: e.to });
-      if (r.ok) estimates.push(r.data);
-      note(r);
+    // Free calls (Travelpayouts): to everywhere, then each selected airport on its own
+    const free: (() => Promise<void>)[] = [];
+    const addEstimates = (e: { from: string; to: string }, dest?: string) =>
+      free.push(async () => {
+        const r = await api.estimates(conn, { origin, from: e.from, to: e.to, dest });
+        if (r.ok) estimates.push(r.data);
+        note(r);
+      });
+    const addOneWays = (e: { month: string; dir: 'out' | 'back' }, dest?: string) =>
+      free.push(async () => {
+        const r = await api.oneWays(conn, { origin, month: e.month, dir: e.dir, dest });
+        if (r.ok) (e.dir === 'out' ? outs : backs).push(r.data);
+        note(r);
+      });
+    plan.estimates.forEach((e) => addEstimates(e));
+    plan.oneWays.forEach((e) => addOneWays(e));
+    for (const route of plan.routes) {
+      route.estimates.forEach((e) => addEstimates(e, route.dest));
+      route.oneWays.forEach((e) => addOneWays(e, route.dest));
     }
-    for (const e of plan.oneWays) {
-      setProgress(`Checking prices ${++step} of ${total}`);
-      const r = await api.oneWays(conn, { origin, month: e.month, dir: e.dir });
-      if (r.ok) (e.dir === 'out' ? outs : backs).push(r.data);
-      note(r);
-    }
+    const total = free.length + plan.explore.length;
+    let step = 0;
+    const tick = () => setProgress(`Checking prices ${++step} of ${total}`);
+    await inBatches(free.map((job) => async () => { await job(); tick(); }), 4);
+    // Then the Google Explore calls, which count against the daily limit
     for (const e of plan.explore) {
-      setProgress(`Checking prices ${++step} of ${total}`);
+      tick();
       const r = await api.explore(conn, { origin, month: e.month, duration: e.duration });
       if (r.ok) explore.push(r.data);
       note(r);
     }
-    setRaw({ explore, estimates, outs, backs, key: callsKey(search) });
+    setRaw({ explore, estimates, outs, backs, key: callsKey(search, selected) });
     setError(problem);
     setProgress('');
     setStatus('done');
     running.current = false;
-  }, [search]);
+  }, [search, selected]);
 
-  // Changing the destinations or the budget re-filters what was fetched without a new search
+  // Changing the budget or filters re-filters what was fetched without a new search
+  const same = useMemo(() => (raw ? buildSameAirport(search, selected, raw.outs, raw.backs, airportByCode) : []), [raw, search, selected]);
   const results = useMemo(
-    () => (raw ? buildResults(search, selected, raw.explore, raw.estimates, airportByCode) : null),
-    [raw, search, selected],
+    () => (raw ? buildResults(search, selected, raw.explore, [...raw.estimates, asDestinations(same)], airportByCode) : null),
+    [raw, search, selected, same],
   );
   const options = useMemo(
     () =>
       raw
-        ? [
-            ...buildOptions(search, selected, raw.explore, raw.estimates, airportByCode),
-            ...buildMixed(search, selected, raw.outs, raw.backs, airportByCode),
-          ]
+        ? mergeOptions([
+            buildOptions(search, selected, raw.explore, raw.estimates, airportByCode),
+            same,
+            buildMixed(search, selected, raw.outs, raw.backs, airportByCode),
+          ])
         : [],
-    [raw, search, selected],
+    [raw, search, selected, same],
   );
   const lists = useMemo(() => (raw ? [...raw.explore, ...raw.estimates] : []), [raw]);
-  const stale = raw != null && raw.key !== callsKey(search);
+  const missing = useMemo(() => (raw ? missingDestinations(search, selected, lists, options, airportByCode) : []), [raw, search, selected, lists, options]);
+  const stale = raw != null && raw.key !== callsKey(search, selected);
 
   const value = useMemo(
-    () => ({ status, progress, error, usage, results, options, stale, lists, run }),
-    [status, progress, error, usage, results, options, stale, lists, run],
+    () => ({ status, progress, error, usage, results, options, missing, stale, lists, run }),
+    [status, progress, error, usage, results, options, missing, stale, lists, run],
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

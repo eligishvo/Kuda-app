@@ -37,6 +37,33 @@ export default function ResultsScreen() {
   const hidden = found.options.length - list.length;
   const mixedCount = useMemo(() => found.options.filter((o) => o.back).length, [found.options]);
 
+  const checkLive = (code: string) => router.push({ pathname: '/destination', params: { code } });
+
+  const footer = !loading && found.missing.length > 0 && (
+    <View style={styles.missing}>
+      <Text style={[styles.section, { color: t.text }]}>Nothing that fits for {found.missing.length} selected {found.missing.length === 1 ? 'airport' : 'airports'}</Text>
+      <Text style={[styles.small, { color: t.muted }]}>
+        The price sources only know some dates. Here is the closest each one had; "Check live" asks Google for dates
+        inside your search (about 6 searches).
+      </Text>
+      {found.missing.map((m) => (
+        <View key={m.airport} style={[styles.row, { backgroundColor: t.panel, borderColor: t.border }]}>
+          <View style={styles.flex}>
+            <Text style={[styles.city, { color: t.text }]} numberOfLines={1}>{m.city} ({m.airport})</Text>
+            <Text style={[styles.small, { color: t.muted }]} numberOfLines={2}>
+              {m.near
+                ? `Closest: ${shortDate(m.near.estimate.outDate)} – ${shortDate(m.near.estimate.retDate)}, $${m.near.estimate.price} each (${originOf(m.near.kind).source}) · ${m.near.why}`
+                : 'No price found for this airport in these months'}
+            </Text>
+          </View>
+          <Pressable onPress={() => checkLive(m.airport)} accessibilityRole="button" style={styles.liveBtn}>
+            <Text style={[styles.check, { color: t.text }]}>Check live ›</Text>
+          </Pressable>
+        </View>
+      ))}
+    </View>
+  );
+
   const open = (o: Option) =>
     router.push({
       pathname: '/destination',
@@ -54,7 +81,7 @@ export default function ResultsScreen() {
       </Text>
       {found.error && <Text style={[styles.small, { color: t.price }]}>{found.error}</Text>}
       {found.stale && !loading && (
-        <Text style={[styles.small, { color: t.price }]}>The search changed since these prices were fetched. Go back and tap Search.</Text>
+        <Text style={[styles.small, { color: t.price }]}>The search or the destinations changed since these prices were fetched. Go back and tap Search.</Text>
       )}
 
       <View style={styles.bar}>
@@ -106,7 +133,7 @@ export default function ResultsScreen() {
       {!loading && found.status === 'done' && list.length === 0 && !found.error && (
         <Text style={[styles.body, { color: t.muted }]}>
           {found.options.length === 0
-            ? 'No prices were found for these dates. Try wider dates, a longer or shorter trip, or other destinations.'
+            ? 'No price fits these dates. See below for the closest ones, or try wider dates or a different trip length.'
             : 'Nothing passes the filters. Raise the price or widen the trip length.'}
         </Text>
       )}
@@ -121,6 +148,7 @@ export default function ResultsScreen() {
       data={list}
       keyExtractor={(o) => `${o.airport}_${o.back?.airport ?? ''}_${o.estimate.outDate}_${o.estimate.retDate}`}
       ListHeaderComponent={header}
+      ListFooterComponent={footer || undefined}
       renderItem={({ item }) => <Row theme={t} o={item} adults={search.adults} onPress={() => open(item)} />}
       initialNumToRender={12}
     />
@@ -148,9 +176,9 @@ function Row({ theme: t, o, adults, onPress }: { theme: Theme; o: Option; adults
           </View>
         </View>
         <View style={styles.meta}>
-          <Badge theme={t} kind={o.kind} mixed={!!o.back} />
+          <Badge theme={t} kind={o.kind} mixed={!!o.split} />
           <Text style={[styles.small, styles.flex, { color: t.muted }]} numberOfLines={1}>
-            {[stopsText(e.stops), e.airline, o.back ? 'two one-way tickets' : ''].filter(Boolean).join(' · ')}
+            {[stopsText(e.stops), e.airline, o.split ? 'two one-way tickets' : ''].filter(Boolean).join(' · ')}
           </Text>
         </View>
       </View>
@@ -232,4 +260,7 @@ const styles = StyleSheet.create({
   right: { alignItems: 'flex-end', gap: 2 },
   price: { fontFamily: FONTS.heading, fontSize: 20 },
   check: { fontFamily: FONTS.bodyMedium, fontSize: 13, marginTop: 6 },
+  section: { fontFamily: FONTS.heading, fontSize: 17 },
+  missing: { gap: 8, marginTop: 18 },
+  liveBtn: { minHeight: TOUCH, justifyContent: 'center', paddingLeft: 6 },
 });

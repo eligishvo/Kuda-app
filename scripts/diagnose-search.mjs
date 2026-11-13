@@ -68,3 +68,23 @@ console.log(`\nAll Google Explore destinations this month: ${[...new Set(rows.fi
 console.log(`\nOne-way fares out (to selected): ${outs.filter((o) => show(o.airport)).map((o) => `${o.airport} ${o.date} $${o.price}`).join(' | ') || '(none)'}`);
 console.log(`One-way fares back (from selected): ${backs.filter((o) => show(o.airport)).map((o) => `${o.airport} ${o.date} $${o.price}`).join(' | ') || '(none)'}`);
 console.log(`One-way totals: ${outs.length} out, ${backs.length} back (all destinations)`);
+
+// Each selected airport on its own (what the app does since 2026-11-13): round trips and two one-way tickets
+if (wanted.size) {
+  console.log('\nPer airport (single-route calls): round trips that fit, and one-way pairs that fit');
+  for (const code of [...wanted].sort()) {
+    const rt = [];
+    const o = [];
+    const b = [];
+    for (const m of months) {
+      rt.push(...(await get(`/estimates?origin=${ORIGIN}&from=${m}&to=${m}&dest=${code}`)));
+      o.push(...(await get(`/oneways?origin=${ORIGIN}&month=${m}&dir=out&dest=${code}`)));
+      b.push(...(await get(`/oneways?origin=${ORIGIN}&month=${m}&dir=back&dest=${code}`)));
+    }
+    const fitRt = rt.filter((r) => why(r.estimate.outDate, r.estimate.retDate, r.estimate.price) === 'KEPT');
+    const pairs = [];
+    for (const x of o) for (const y of b) if (why(x.date, y.date, x.price + y.price) === 'KEPT') pairs.push({ out: x.date, ret: y.date, price: x.price + y.price });
+    pairs.sort((p, q) => p.price - q.price);
+    console.log(`  ${code}: ${rt.length} round trips (${fitRt.length} fit) · ${o.length} fares out, ${b.length} back → ${pairs.length} pairs fit${pairs.length ? `, cheapest ${pairs[0].out} → ${pairs[0].ret} $${pairs[0].price}` : ''}`);
+  }
+}

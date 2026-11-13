@@ -111,8 +111,8 @@ export function normalizeTravelpayouts(raw: unknown): Destination[] {
   return out.sort((a, b) => a.estimate.price - b.estimate.price || a.airport.localeCompare(b.airport));
 }
 
-/** How many dates are kept per airport from one answer of one-way fares. */
-export const ONE_WAYS_PER_AIRPORT = 10;
+/** How many dates are kept per airport from one answer of one-way fares (one a day for a month). */
+export const ONE_WAYS_PER_AIRPORT = 31;
 
 /**
  * Travelpayouts one-way fares → OneWay[]. `dir` says which way they go: 'out' = from the departure airport

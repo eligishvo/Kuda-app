@@ -144,6 +144,19 @@ describe('Worker: endpoints', () => {
     expect((await call('/oneways?origin=TLV&month=12&dir=out')).status).toBe(400);
   });
 
+  it('/estimates and /oneways can ask about one destination, cached separately', async () => {
+    const { call, net, kv } = setup();
+    await call('/estimates?origin=TLV&from=2027-03&to=2027-03&dest=FCO');
+    expect(net.calls[0].searchParams.get('destination')).toBe('FCO');
+    expect(kv.data.has('estimates:TLV:2027-03:2027-03:FCO')).toBe(true);
+    await call('/oneways?origin=TLV&month=2027-03&dir=out&dest=FCO');
+    expect(Object.fromEntries(net.calls[1].searchParams)).toMatchObject({ origin: 'TLV', destination: 'FCO', one_way: 'true' });
+    await call('/oneways?origin=TLV&month=2027-03&dir=back&dest=FCO');
+    expect(Object.fromEntries(net.calls[2].searchParams)).toMatchObject({ origin: 'FCO', destination: 'TLV', one_way: 'true' });
+    expect(kv.data.has('oneways:TLV:2027-03:back:FCO')).toBe(true);
+    expect((await call('/estimates?origin=TLV&from=2027-03&to=2027-03&dest=Rome')).status).toBe(400);
+  });
+
   it('/flights lists outbound options with their departure tokens (kept one hour)', async () => {
     const { call, net, kv } = setup();
     const r = await call('/flights?origin=TLV&dest=ATH&out=2026-12-07&ret=2026-12-14&adults=2');

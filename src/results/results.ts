@@ -1,9 +1,9 @@
 // Turns the raw price lists from the Worker into what the map and the results list show:
 // one line per destination airport, with the best price that fits the user's dates and budget.
 // Plain functions (no React, no network) so the rules are easy to test.
-import { addDays, durationBucket, fitsWindow, monthsInWindow, Window } from '../../shared/dates';
+import { addDays, durationBucket, fitsWindow, monthsInWindow, nightsBetween, Window } from '../../shared/dates';
 import { Destination, OneWay, PriceEstimate } from '../../shared/types';
-import { Search } from '../search/search';
+import { Search, shortDate } from '../search/search';
 
 /** live = Google's price; estimate / rough = older Travelpayouts fares; none = nothing for these dates. */
 export type ResultKind = 'live' | 'estimate' | 'rough' | 'none';
@@ -36,17 +36,24 @@ export const MAX_ESTIMATE_CALLS = 8;
 export type Plan = {
   explore: { month: number; duration: 1 | 2 | 3 }[];
   estimates: { from: string; to: string }[];
-  /** One-way fares, only when trips returning from another airport are wanted (free Travelpayouts calls). */
+  /** One-way fares to and from everywhere (free Travelpayouts calls). */
   oneWays: { month: string; dir: 'out' | 'back' }[];
+  /**
+   * The same two kinds of free calls again for each selected airport on its own: the answers for "everywhere"
+   * hold only a few dates per destination, the ones for a single route hold many more.
+   */
+  routes: { dest: string; estimates: { from: string; to: string }[]; oneWays: { month: string; dir: 'out' | 'back' }[] }[];
 };
 
 export const MAX_ONE_WAY_CALLS = 8;
+/** At most this many selected airports get their own calls (they are free, but each takes a moment). */
+export const MAX_ROUTE_AIRPORTS = 15;
 
 /**
  * Which Worker calls a search needs. Google Explore is asked once per month you could leave in;
  * Travelpayouts (free) once per month, plus once for trips that leave in one month and return in the next.
  */
-export function planCalls(s: Search): Plan {
+export function planCalls(s: Search, selected: string[] = []): Plan {
   const lastOut = addDays(s.latestRet, -s.minNights);
   const months = monthsInWindow(s.earliestOut, lastOut < s.earliestOut ? s.earliestOut : lastOut);
   const duration = durationBucket(s.minNights, s.maxNights);
@@ -60,13 +67,20 @@ export function planCalls(s: Search): Plan {
   // One-way fares: the months you could leave in, and the months you could come back in
   const firstBack = addDays(s.earliestOut, s.minNights);
   const backMonths = monthsInWindow(firstBack > s.latestRet ? s.latestRet : firstBack, s.latestRet);
-  const oneWays: Plan['oneWays'] = s.mixAirports
-    ? [...months.map((m) => ({ month: ym(m), dir: 'out' as const })), ...backMonths.map((m) => ({ month: ym(m), dir: 'back' as const }))].slice(0, MAX_ONE_WAY_CALLS)
-    : [];
+  // Always fetched: two one-way tickets often make a trip the round-trip lists don't have
+  const oneWays: Plan['oneWays'] = [
+    ...months.map((m) => ({ month: ym(m), dir: 'out' as const })),
+    ...backMonths.map((m) => ({ month: ym(m), dir: 'back' as const })),
+  ].slice(0, MAX_ONE_WAY_CALLS);
+  const routes: Plan['routes'] = [...new Set(selected)]
+    .sort()
+    .slice(0, MAX_ROUTE_AIRPORTS)
+    .map((dest) => ({ dest, estimates: estimates.slice(0, 3), oneWays: oneWays.slice(0, 4) }));
   return {
     explore: months.slice(0, MAX_EXPLORE_CALLS).map((m) => ({ month: m.month, duration })),
     estimates: estimates.slice(0, MAX_ESTIMATE_CALLS),
     oneWays,
+    routes,
   };
 }
 
@@ -151,7 +165,12 @@ export function stopsText(stops: number | null): string {
  * One line of the results list: a destination on specific dates, with its price.
  * `back` is set when the trip flies home from a different airport than it arrives at.
  */
-export type Option = Result & { estimate: PriceEstimate; back?: { airport: string; city: string; name: string } };
+export type Option = Result & {
+  estimate: PriceEstimate;
+  back?: { airport: string; city: string; name: string };
+  /** Priced as two one-way tickets (out and back bought separately). */
+  split?: boolean;
+};
 
 /** With nothing selected, only airports this close to each other are paired (kilometres). */
 export const MIX_RADIUS_KM = 400;
@@ -212,6 +231,7 @@ export function buildMixed(
             airport: a, cc: ia.cc, city: ia.city || a, name: ia.name, lat: ia.lat, lon: ia.lon,
             kind: o.confidence === 'estimate' && r.confidence === 'estimate' ? 'estimate' : 'rough',
             back: { airport: b, city: ib.city || b, name: ib.name },
+            split: true,
             estimate: {
               source: 'travelpayouts',
               confidence: o.confidence === 'estimate' && r.confidence === 'estimate' ? 'estimate' : 'rough',
@@ -341,4 +361,151 @@ export function originOf(kind: ResultKind, mixed = false): Origin {
     };
   }
   return { source: 'Google Flights', status: 'No price', detail: 'Neither source has a price for these dates. The live check asks Google directly.' };
+}
+
+/** How many date combinations of two one-way tickets are kept per airport. */
+export const SAME_PER_AIRPORT = 4;
+
+/**
+ * Round trips to one airport made of two one-way tickets: out to it, back from it. Budget airlines sell
+ * one-way tickets, and the one-way lists hold many more dates than the round-trip lists, so this finds trips
+ * of the requested length that the round-trip prices miss.
+ */
+export function buildSameAirport(
+  s: Search,
+  selected: string[],
+  outs: OneWay[][],
+  backs: OneWay[][],
+  infoOf: (code: string) => AirportInfo | undefined,
+): Option[] {
+  const w = windowOf(s);
+  const wanted = selected.length === 0 ? null : new Set(selected);
+  const byAirport = (lists: OneWay[][]) => {
+    const m = new Map<string, Map<string, OneWay>>();
+    for (const list of lists) {
+      for (const o of list) {
+        if (wanted && !wanted.has(o.airport)) continue;
+        const dates = m.get(o.airport) ?? new Map<string, OneWay>();
+        const prev = dates.get(o.date);
+        if (!prev || o.price < prev.price) dates.set(o.date, o);
+        m.set(o.airport, dates);
+      }
+    }
+    return m;
+  };
+  const outBy = byAirport(outs);
+  const backBy = byAirport(backs);
+  const all: Option[] = [];
+  for (const [code, outDates] of outBy) {
+    const backDates = backBy.get(code);
+    const info = infoOf(code);
+    if (!backDates || !info || info.cc === s.departureCc) continue;
+    const combos: Option[] = [];
+    for (const o of outDates.values()) {
+      for (const r of backDates.values()) {
+        if (!fitsWindow(o.date, r.date, w)) continue;
+        const trusted = o.confidence === 'estimate' && r.confidence === 'estimate';
+        combos.push({
+          airport: code, cc: info.cc, city: info.city || code, name: info.name, lat: info.lat, lon: info.lon,
+          kind: trusted ? 'estimate' : 'rough',
+          split: true,
+          estimate: {
+            source: 'travelpayouts',
+            confidence: trusted ? 'estimate' : 'rough',
+            price: o.price + r.price,
+            outDate: o.date,
+            retDate: r.date,
+            nights: nightsBetween(o.date, r.date),
+            stops: o.stops == null || r.stops == null ? null : Math.max(o.stops, r.stops),
+            airline: [...new Set([o.airline, r.airline].filter(Boolean))].join(' + ') || undefined,
+            outTime: o.time,
+            retTime: r.time,
+          },
+        });
+      }
+    }
+    // The cheapest few, preferring trusted (nonstop) fares
+    combos.sort((x, y) => (x.kind === 'rough' ? 1 : 0) - (y.kind === 'rough' ? 1 : 0) || x.estimate.price - y.estimate.price);
+    all.push(...combos.slice(0, SAME_PER_AIRPORT));
+  }
+  return all;
+}
+
+/** Joins lists of options, keeping one per airport pair and dates: the cheaper, or Google's on a tie. */
+export function mergeOptions(lists: Option[][]): Option[] {
+  const best = new Map<string, Option>();
+  for (const list of lists) {
+    for (const o of list) {
+      const key = `${o.airport}_${o.back?.airport ?? ''}_${o.estimate.outDate}_${o.estimate.retDate}`;
+      const prev = best.get(key);
+      if (!prev || o.estimate.price < prev.estimate.price || (o.estimate.price === prev.estimate.price && o.kind === 'live')) best.set(key, o);
+    }
+  }
+  return [...best.values()];
+}
+
+/** Two-ticket options turned back into price lists, so the map's pins can use them too. */
+export const asDestinations = (options: Option[]): Destination[] =>
+  options.filter((o) => !o.back).map((o) => ({ airport: o.airport, city: o.city, lat: o.lat, lon: o.lon, estimate: o.estimate }));
+
+/** A selected airport with nothing that fits, and the nearest thing that was found for it. */
+export type Missing = {
+  airport: string;
+  city: string;
+  name: string;
+  /** The price that came closest to the search, and why it doesn't fit. */
+  near?: { estimate: PriceEstimate; kind: ResultKind; why: string };
+};
+
+/** How far a trip is from fitting the search, in days (0 = it fits). */
+function missBy(e: PriceEstimate, s: Search): number {
+  const early = Math.max(0, nightsBetween(e.outDate, s.earliestOut));
+  const late = Math.max(0, nightsBetween(s.latestRet, e.retDate));
+  const short = Math.max(0, s.minNights - e.nights);
+  const long = Math.max(0, e.nights - s.maxNights);
+  return early + late + short + long;
+}
+
+function whyMissed(e: PriceEstimate, s: Search): string {
+  const parts: string[] = [];
+  if (e.nights < s.minNights || e.nights > s.maxNights) parts.push(`${e.nights} days`);
+  if (e.outDate < s.earliestOut) parts.push(`leaves ${shortDate(e.outDate)}`);
+  if (e.retDate > s.latestRet) parts.push(`back ${shortDate(e.retDate)}`);
+  return parts.join(', ');
+}
+
+/**
+ * The selected airports that got no option that fits the dates, each with the closest price found and why it
+ * doesn't fit (e.g. Google's only trip to Vienna is 16 days and ends on 6 April). Empty when nothing is selected.
+ */
+export function missingDestinations(
+  s: Search,
+  selected: string[],
+  lists: Destination[][],
+  options: Option[],
+  infoOf: (code: string) => AirportInfo | undefined,
+): Missing[] {
+  if (selected.length === 0) return [];
+  const covered = new Set(options.filter((o) => !o.back).map((o) => o.airport));
+  const out: (Missing & { score: number })[] = [];
+  for (const code of [...new Set(selected)]) {
+    const info = infoOf(code);
+    if (covered.has(code) || !info || info.cc === s.departureCc) continue;
+    let near: Missing['near'];
+    let score = Infinity;
+    for (const list of lists) {
+      for (const d of list) {
+        if (d.airport !== code) continue;
+        const by = missBy(d.estimate, s);
+        if (by < score || (by === score && near && d.estimate.price < near.estimate.price)) {
+          score = by;
+          near = { estimate: d.estimate, kind: d.estimate.confidence, why: whyMissed(d.estimate, s) };
+        }
+      }
+    }
+    out.push({ airport: code, city: info.city || code, name: info.name, near, score });
+  }
+  return out
+    .sort((a, b) => a.score - b.score || a.city.localeCompare(b.city))
+    .map(({ score: _score, ...m }) => m);
 }
